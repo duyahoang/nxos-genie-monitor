@@ -27,7 +27,7 @@ import re
 from getpass import getpass
 
 
-def make_connection(testbed_dict):  # testbed_dict: dict):
+def make_connection(testbed_dict)
 
     global first_time_connection
     hostname = list(testbed_dict["devices"].keys())[0]
@@ -53,10 +53,10 @@ def make_connection(testbed_dict):  # testbed_dict: dict):
                     "Please check the hostname, IP aaddress, username, and password.\n"
                 )
                 sys.exit()
-            # except:
-            # print("Somethings went wrong.")
-            # print("Unexpected error:", sys.exc_info()[0])
-            # sys.exit()
+            except:
+                print("Somethings went wrong.")
+                print("Unexpected error:", sys.exc_info()[0])
+                sys.exit()
         else:
             print(
                 "The program is trying to connect to the {} {} device via {} port {}}.".format(
@@ -252,7 +252,7 @@ def prepend_line(file_name, line):
         os.rename(dummy_file, file_name)
 
 
-def main():  # , testbed_dict):
+def main():
 
     global testbed_dict
     global have_original
@@ -381,12 +381,12 @@ def main():  # , testbed_dict):
             prepend_line("all_diff.txt", line_string)
 
 
-def main_recursion():  # , testbed_dict):
+def main_recursion():
 
     global have_original, is_detail
 
     try:
-        main()  # , testbed_dict)
+        main()
     except KeyboardInterrupt:
 
         if not have_original:
