@@ -8,6 +8,7 @@
 # Using Ctrl-C to pause the program to change the mode or exit the program.
 
 # Requirement:
+# python 3.8
 # pip install genie[library]
 
 from time import sleep
@@ -27,7 +28,7 @@ import re
 from getpass import getpass
 
 
-def make_connection(testbed_dict)
+def make_connection(testbed_dict):  # testbed_dict: dict):
 
     global first_time_connection
     hostname = list(testbed_dict["devices"].keys())[0]
@@ -38,11 +39,11 @@ def make_connection(testbed_dict)
         if first_time_connection:
             try:
                 print(
-                    "The program is trying to connect to the {} {} device via {} port {}}.".format(
-                        testbed_dict["ip"],
-                        testbed_dict["os"].upper(),
-                        testbed_dict["protocol"].upper(),
-                        testbed_dict["port"],
+                    "\nThe program is trying to connect to the {} {} device via {} port {}.".format(
+                        testbed_dict["devices"][hostname]["ip"],
+                        testbed_dict["devices"][hostname]["os"].upper(),
+                        testbed_dict["devices"][hostname]["protocol"].upper(),
+                        22,
                     )
                 )
                 device.connect(log_stdout=False, prompt_recovery=True)
@@ -53,17 +54,17 @@ def make_connection(testbed_dict)
                     "Please check the hostname, IP aaddress, username, and password.\n"
                 )
                 sys.exit()
-            except:
-                print("Somethings went wrong.")
-                print("Unexpected error:", sys.exc_info()[0])
-                sys.exit()
+            # except:
+            #     print("Somethings went wrong.")
+            #     print("Unexpected error:", sys.exc_info()[0])
+            #     sys.exit()
         else:
             print(
-                "The program is trying to connect to the {} {} device via {} port {}}.".format(
-                    testbed_dict["ip"],
-                    testbed_dict["os"].upper(),
-                    testbed_dict["protocol"].upper(),
-                    testbed_dict["port"],
+                "\nThe program is trying to connect to the {} {} device via {} port {}.".format(
+                    testbed_dict["devices"][hostname]["ip"],
+                    testbed_dict["devices"][hostname]["os"].upper(),
+                    testbed_dict["devices"][hostname]["protocol"].upper(),
+                    22,
                 )
             )
             device.connect(log_stdout=False, prompt_recovery=True)
@@ -130,6 +131,9 @@ def learn_arp(device) -> dict:
                     ],
                 ):
                     arp_entries = arp_entries + 1
+
+    except ConnectionError:
+        print("\nThe connection is disconnected. The device may be reloading.")
 
     except:
         print(
@@ -254,16 +258,20 @@ def prepend_line(file_name, line):
 
 def main():
 
+    # declare global variables that are used by the main function
     global testbed_dict
     global have_original
     global is_detail
     global num_intf_up_original, intf_up_list_original, total_mac_address_original, arp_entries_original, num_routes_original
     global all_original
 
+    # call make_connection to connect to the device. Passing the global testbed_dict variabl
     device = make_connection(testbed_dict)
     if device.is_connected():
         print("The device is connected.")
 
+    # if the program have not capture the original snapshot, then it will do it.
+    # if the main function is called again, then it would not re-capture the original snapshot.
     if not have_original:
 
         now1 = datetime.now()
@@ -289,8 +297,11 @@ def main():
         have_original = True
 
     print("The programs is beginning to monitor.")
+
+    # infinity while loop to keep monitor the device and compare with original snapshot
     while True:
 
+        # learn the common information of device's after state
         (
             num_intf_up_after,
             intf_up_list_after,
@@ -299,6 +310,7 @@ def main():
             num_routes_after,
         ) = learn_common(device)
 
+        # find the delta between original and after state of device
         delta_intf = num_intf_up_original - num_intf_up_after
         delta_mac = total_mac_address_original - total_mac_address_after
         delta_arp = arp_entries_original - arp_entries_after
@@ -381,12 +393,12 @@ def main():
             prepend_line("all_diff.txt", line_string)
 
 
-def main_recursion():
+def main_recursion():  # , testbed_dict):
 
     global have_original, is_detail
 
     try:
-        main()
+        main()  # , testbed_dict)
     except KeyboardInterrupt:
 
         if not have_original:
@@ -442,10 +454,10 @@ def main_recursion():
         sleep(30)
         main_recursion()
 
-    except:
-        print("Somethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    # except:
+    #     print("Somethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
 
 
 if os.path.exists("./all_diff.txt"):
@@ -466,14 +478,16 @@ hostname = input("Enter the hostname of the device: ")
 ip = input("Enter the IP address of the device: ")
 username = input("Enter username: ")
 password = getpass()
-lost_mac_safe = input(
-    "Enter the percentage lost of insignificant amount of MAC addresses: "
+lost_mac_safe = int(
+    input("Enter the percentage lost of insignificant amount of MAC addresses: ")
 )
-lost_arp_entries = input(
-    "Enter the percentage lost of insignificant amount of ARP entries: "
+lost_arp_entries = int(
+    input("Enter the percentage lost of insignificant amount of ARP entries: ")
 )
-lost_routes = input(
-    "Enter the percentage lost of insignificant amount of routes in routing table: "
+lost_routes = int(
+    input(
+        "Enter the percentage lost of insignificant amount of routes in routing table: "
+    )
 )
 testbed_dict = {
     "devices": {
