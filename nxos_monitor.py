@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Cisco System, Inc
 # Author: Duy Hoang
 # Mentors: Andy Jaramillo, Nathan Hemingway
@@ -16,19 +18,22 @@ from genie import testbed
 from genie.libs.ops.interface.nxos.interface import Interface
 from genie.libs.ops.fdb.nxos.fdb import Fdb
 from genie.libs.ops.routing.nxos.routing import Routing
+from genie.libs.ops.vlan.nxos.vlan import Vlan
+from genie.libs.ops.ospf.nxos.ospf import Ospf
+from genie.libs.ops.bgp.nxos.bgp import Bgp
 from genie.libs.parser.utils import get_parser_exclude
 from genie.utils.diff import Diff
 from unicon.core.errors import ConnectionError
 import os
 from datetime import datetime
-import time
 import concurrent.futures
 import sys
 import re
 from getpass import getpass
+from pprint import pprint
 
 
-def make_connection(testbed_dict):  # testbed_dict: dict):
+def make_connection(testbed_dict):
 
     global first_time_connection
     hostname = list(testbed_dict["devices"].keys())[0]
@@ -39,7 +44,8 @@ def make_connection(testbed_dict):  # testbed_dict: dict):
         if first_time_connection:
             try:
                 print(
-                    "\nThe program is trying to connect to the {} {} device via {} port {}.".format(
+                    "\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
+                        hostname,
                         testbed_dict["devices"][hostname]["ip"],
                         testbed_dict["devices"][hostname]["os"].upper(),
                         testbed_dict["devices"][hostname]["protocol"].upper(),
@@ -88,8 +94,38 @@ def learn_interface(device):
             intf_up_list.append(intf)
             num_intf_up = num_intf_up + 1
 
-    return (num_intf_up, intf_up_list)
+    # return (num_intf_up, intf_up_list)
+    return intf_up_list
 
+
+def learn_vlan(device):
+
+    # vlan_list = []
+    # num_vlan = 0
+
+    vlan_object = Vlan(device=device)
+    vlan_object.learn()
+    if vlan_object.info.get("vlans", None):
+        vlan_object.info["vlans"].pop("interface_vlan_enabled", None)
+        vlan_object.info["vlans"].pop("vn_segment_vlan_based_enabled", None)
+        vlan_object.info["vlans"].pop("configuration", None)
+
+        # pprint(vlan_object.info)
+        # print(len(list(vlan_object.info["vlans"].keys())))
+        # sys.exit()
+        # for vlan in vlan_object.info["vlans"]:
+        #     if (
+        #         vlan_object.info["vlans"][vlan].get("state", None)
+        #         # and vlan_object.info["vlans"][vlan]["state"] == "active"
+        #     ):
+        #         vlan_list.append(vlan)
+        #         num_vlan = num_vlan + 1
+
+        # return num_vlan, vlan_list
+        # return num_vlan, vlan_object.info["vlans"]
+        return vlan_object.info["vlans"]
+    else:
+        return {}
 
 def learn_fdb(device) -> int:
 
@@ -145,6 +181,27 @@ def learn_arp(device) -> dict:
     return arp_entries
 
 
+def learn_stp(device):
+
+    stp_object_output = {}
+
+    try:
+        cmd = "show spanning-tree detail"
+        stp_detail_output = device.parse(cmd)
+        # if stp_detail_output is dict:
+        #     stp_object_output.update(stp_detail_output)
+    except:
+        print(
+            "\nCannot parse the command: {}\nThe device may not support this command.\n".format(
+                cmd
+            )
+        )
+
+    # pprint(stp_detail_output)
+
+    # sys.exit()
+
+
 def learn_routing(device: dict):
 
     num_routes = 0
@@ -161,6 +218,96 @@ def learn_routing(device: dict):
             )
 
     return num_routes
+
+
+def learn_ospf(device):
+
+    # ospf_neighbor_dict = {
+    #     "virtual_links": [],
+    #     "sham_links": [],
+    #     "interfaces": []
+    # }
+    ospf_neighbor_list = []
+    ospf_object = Ospf(device=device)
+    ospf_object.learn()
+    if ospf_object.info["feature_ospf"] == True and ospf_object.info.get("vrf", None):
+        for vrf in list(ospf_object.info["vrf"].keys()):
+            for instance in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"].keys()):
+                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance].get("areas", None):
+                
+                    for area in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"].keys()):
+                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("virtual_links", None):
+                            for vLink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"].keys()):
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink].get("neighbors", None):
+                                    for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"].keys()):
+                                   
+                                        neighbor_dict = {
+                                            "vrf": vrf,
+                                            "ospf_instance": instance,
+                                            "area": area,
+                                            "virtual_link": vLink,
+                                            "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["neighbor_router_id"],
+                                            "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["address"],
+                                            "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["state"]
+                                        }
+                        
+                                        # ospf_neighbor_dict["virtual_links"].append(neighbor_dict)
+                                        ospf_neighbor_list.append(neighbor_dict)
+
+                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("sham_links", None):
+                            for slink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"].keys()):
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink].get("neighbors", None):
+                                    for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"].keys()):
+                                    
+                                        neighbor_dict = {
+                                            "vrf": vrf,
+                                            "ospf_instance": instance,
+                                            "area": area,
+                                            "sham_link": slink,
+                                            "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["neighbor_router_id"],
+                                            "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["address"],
+                                            "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["state"]
+                                        }
+                                        # ospf_neighbor_dict["sham_links"].append(neighbor_dict)
+                                        ospf_neighbor_list.append(neighbor_dict)
+
+                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("interfaces", None):
+                            for interface in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"].keys()):
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface].get("neighbors", None):
+                                    for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"].keys()):
+                                    
+                                        neighbor_dict = {
+                                            "vrf": vrf,
+                                            "ospf_instance": instance,
+                                            "area": area,
+                                            "interface": interface,
+                                            "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["neighbor_router_id"],
+                                            "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["address"],
+                                            "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["state"]
+                                        }
+                                        # ospf_neighbor_dict["interfaces"].append(neighbor_dict)    
+                                        ospf_neighbor_list.append(neighbor_dict)   
+    
+    
+    # if len(ospf_neighbor_dict["virtual_links"]) > 0:
+    #     ospf_neighbor_dict["virtual_links"] = sorted(ospf_neighbor_dict["virtual_links"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["virtual_link"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
+    # if len(ospf_neighbor_dict["sham_links"]) > 0:
+    #     ospf_neighbor_dict["sham_links"] = sorted(ospf_neighbor_dict["sham_links"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["sham_link"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
+    # if len(ospf_neighbor_dict["interfaces"]) > 0:
+    #     ospf_neighbor_dict["interfaces"] = sorted(ospf_neighbor_dict["interfaces"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["interface"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
+    
+    # with open("ospf_output.txt", "w") as write_obj:
+    #     for key in ospf_neighbor_dict.keys():
+    #         for neighbor in ospf_neighbor_dict[key]:
+    #             pprint(neighbor, stream=write_obj)
+    #             write_obj.write("--------------------------------------------------------\n")
+
+    with open("ospf_output.txt", "w") as write_obj:
+            for neighbor in ospf_neighbor_list:
+                pprint(neighbor, stream=write_obj)
+                write_obj.write("--------------------------------------------------------\n")
+    # return ospf_neighbor_dict
+    return ospf_neighbor_list
 
 
 def parse_all_cmd(device):
@@ -222,16 +369,33 @@ def learn_common(device):
     with concurrent.futures.ThreadPoolExecutor() as executor:
 
         intf_executor = executor.submit(learn_interface, device)
+        vlan_executor = executor.submit(learn_vlan, device)
         mac_executor = executor.submit(learn_fdb, device)
         arp_executor = executor.submit(learn_arp, device)
+        stp_executor = executor.submit(learn_stp, device)
         routes_executor = executor.submit(learn_routing, device)
+        ospf_executor = executor.submit(learn_ospf, device)
 
-        num_intf_up, intf_up_list = intf_executor.result()
+        # num_intf_up, intf_up_list = intf_executor.result()
+        intf_up_list = intf_executor.result()
+        # num_vlan, vlan_list = vlan_executor.result()
+        vlan_dict = vlan_executor.result()
         total_mac_address = mac_executor.result()
         arp_entries = arp_executor.result()
+        stp_none = stp_executor.result()
         num_routes = routes_executor.result()
+        ospf_neighbor_list = ospf_executor.result()
 
-    return num_intf_up, intf_up_list, total_mac_address, arp_entries, num_routes
+    return (
+        # num_intf_up,
+        intf_up_list,
+        # num_vlan,
+        vlan_dict,
+        total_mac_address,
+        arp_entries,
+        num_routes,
+        ospf_neighbor_list
+    )
 
 
 def prepend_line(file_name, line):
@@ -262,7 +426,7 @@ def main():
     global testbed_dict
     global have_original
     global is_detail
-    global num_intf_up_original, intf_up_list_original, total_mac_address_original, arp_entries_original, num_routes_original
+    global intf_up_list_original,  vlan_dict_original, total_mac_address_original, arp_entries_original, num_routes_original, ospf_neighbor_list_original #, num_intf_up_original, num_vlan_original,
     global all_original
 
     # call make_connection to connect to the device. Passing the global testbed_dict variabl
@@ -273,20 +437,23 @@ def main():
     # if the program have not capture the original snapshot, then it will do it.
     # if the main function is called again, then it would not re-capture the original snapshot.
     if not have_original:
-
+        print("The program is learning device's common information original state...")
         now1 = datetime.now()
         (
-            num_intf_up_original,
+            # num_intf_up_original,
             intf_up_list_original,
+            # num_vlan_original,
+            vlan_dict_original,
             total_mac_address_original,
             arp_entries_original,
             num_routes_original,
+            ospf_neighbor_list_original
         ) = learn_common(device)
 
         now2 = datetime.now()
 
         print(
-            "The common information for original state has learned in {} seconds.".format(
+            "The common information for original state has learned in {:.2f} seconds.".format(
                 (now2 - now1).total_seconds()
             )
         )
@@ -303,26 +470,81 @@ def main():
 
         # learn the common information of device's after state
         (
-            num_intf_up_after,
+            # num_intf_up_after,
             intf_up_list_after,
+            # num_vlan_after,
+            vlan_dict_after,
             total_mac_address_after,
             arp_entries_after,
             num_routes_after,
+            ospf_neighbor_list_after
         ) = learn_common(device)
 
         # find the delta between original and after state of device
-        delta_intf = num_intf_up_original - num_intf_up_after
+        # delta_intf = num_intf_up_original - num_intf_up_after
+        # delta_vlan = num_vlan_original - num_vlan_after
         delta_mac = total_mac_address_original - total_mac_address_after
         delta_arp = arp_entries_original - arp_entries_after
         delta_routes = num_routes_original - num_routes_after
 
-        percentage_delta_intf = (delta_intf / num_intf_up_original) * 100
+        # percentage_delta_intf = (delta_intf / num_intf_up_original) * 100
+        # percentage_delta_vlan = (delta_vlan / num_vlan_original) * 100
         percentage_delta_mac = (delta_mac / total_mac_address_original) * 100
         percentage_delta_arp = (delta_arp / arp_entries_original) * 100
         percentage_delta_routes = (delta_routes / num_routes_original) * 100
 
+        #find interface changed to down
+        intf_down_list = []
+        for intf in intf_up_list_original:
+            if intf not in intf_up_list_after:
+                intf_down_list.append(intf)
+        
+        delta_intf = len(intf_down_list)
+        percentage_delta_intf = (len(intf_down_list) / len(intf_up_list_original)) * 100
+        
+        #find vlan changed
+        vlan_change_list = []
+        if len(vlan_dict_original) > 0:
+            for vlan_original in list(vlan_dict_original.keys()):
+                if vlan_dict_original[vlan_original]["state"] != "active":
+                    continue
+                else:
+                    if vlan_original in list(vlan_dict_after.keys()):
+                        if vlan_dict_after[vlan_original]["state"] != "active":
+                                vlan_change_list.append({vlan_original: vlan_dict_after[vlan_original]})
+                    else:
+                        vlan_change_list.append({vlan_original: {"state": "Not found in VLAN database"} })
+            
+            delta_vlan = len(vlan_change_list)
+            percentage_delta_vlan = (len(vlan_change_list) / len(vlan_dict_original)) * 100
+        
+
+
+        #find OSPF neighbor changed
+        neighbor_change_list = []
+        for neighbor_original in ospf_neighbor_list_original:
+            if neighbor_original["state"] != "full":
+                continue
+            else:
+                for neighbor_after in ospf_neighbor_list_after:
+                    if neighbor_after.get("virtual_link"):
+                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["virtual_link"] == neighbor_original["virtual_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                            continue
+                    if neighbor_after.get("sham_link"):
+                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["sham_link"] == neighbor_original["sham_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                            continue
+                    if neighbor_after.get("interface"):
+                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["interface"] == neighbor_original["interface"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                            continue
+            
         if (
-            len(intf_up_list_after) == len(intf_up_list_original)
+            len(intf_down_list) == 0
+            # and len(vlan_list_after) >= len(vlan_list_original)
+            and len(vlan_change_list) == 0
+            and len(neighbor_change_list) == 0
             and percentage_delta_mac < lost_mac_safe
             and percentage_delta_arp < lost_arp_entries
             and percentage_delta_routes < lost_routes
@@ -341,33 +563,53 @@ def main():
             )
 
             print(
-                "There are {} ({}%) interfaces changed to down.".format(
+                "There are {} ({:.2f}%) interfaces changed to down.".format(
                     delta_intf, percentage_delta_intf
                 )
             )
             print("List of the interfaces changed to down:")
-            for intf in intf_up_list_original:
-                if intf not in intf_up_list_after:
-                    print(intf)
+            for intf in intf_down_list:
+                print(intf)
             print()
+
             print(
-                "There are {} ({}%) MAC addresses is lost.".format(
+                "There are {} ({:.2f}%) vlans changed.".format(
+                    delta_vlan, percentage_delta_vlan
+                )
+            )
+            print("List of the vlans changed to down:")
+            # for vlan in vlan_list_original:
+            #     if vlan not in vlan_list_after:
+            #         print("VLAN {}".format(vlan))
+            for vlan_dict in vlan_change_list:
+                vlan = list(vlan_dict.keys())[0]
+                state = vlan_dict[vlan]["state"]
+                print("VLAN {} - state: {}".format(vlan, state))
+            print()
+            
+            for neighbor_dict in neighbor_change_list:
+                pprint(neighbor_dict)
+            
+            print()
+            
+            print(
+                "There are {} ({:.2f}%) MAC addresses is lost.".format(
                     delta_mac, percentage_delta_mac
                 )
             )
 
             print(
-                "There are {} ({}%) ARP entries is lost.".format(
+                "There are {} ({:.2f}%) ARP entries is lost.".format(
                     delta_arp, percentage_delta_arp
                 )
             )
 
             print(
-                "There are {} ({}%) routes is lost.".format(
+                "There are {} ({:.2f}%) routes is lost.".format(
                     delta_routes, percentage_delta_routes
                 )
             )
-
+        print()
         if is_detail:
 
             print("\nThe porgram is parsing all commands.")
@@ -393,12 +635,12 @@ def main():
             prepend_line("all_diff.txt", line_string)
 
 
-def main_recursion():  # , testbed_dict):
+def main_recursion():
 
     global have_original, is_detail
 
     try:
-        main()  # , testbed_dict)
+        main()
     except KeyboardInterrupt:
 
         if not have_original:
@@ -466,39 +708,63 @@ if os.path.exists("./all_diff.txt"):
 have_original = False
 is_detail = False
 
-num_intf_up_original = 0
+# num_intf_up_original = 0
 intf_up_list_original = []
+# num_vlan_original = 0
+vlan_dict_original = {}
 total_mac_address_original = 0
 arp_entries_original = 0
 num_routes_original = 0
+ospf_neighbor_list_original = []
 all_original = {}
+
 first_time_connection = True
 
-hostname = input("Enter the hostname of the device: ")
-ip = input("Enter the IP address of the device: ")
-username = input("Enter username: ")
-password = getpass()
-lost_mac_safe = int(
-    input("Enter the percentage lost of insignificant amount of MAC addresses: ")
-)
-lost_arp_entries = int(
-    input("Enter the percentage lost of insignificant amount of ARP entries: ")
-)
-lost_routes = int(
-    input(
-        "Enter the percentage lost of insignificant amount of routes in routing table: "
+print()
+
+try:
+    if os.path.exists("./databaseconfig.py"):
+        print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
+
+    import databaseconfig as cfg
+
+    print("Imported databaseconfig.py file successfully.")
+    testbed_dict = cfg.testbed_dict
+    lost_mac_safe = cfg.lost_mac_safe
+    lost_arp_entries = cfg.lost_arp_entries
+    lost_routes = cfg.lost_routes
+except:
+
+    print(
+        "Cannot find or import {}/databaseconfig.py\n".format(
+            os.path.abspath(os.getcwd())
+        )
     )
-)
-testbed_dict = {
-    "devices": {
-        hostname: {
-            "ip": ip,
-            "protocol": "ssh",
-            "username": username,
-            "password": password,
-            "os": "nxos",
-        },
+    hostname = input("Enter the hostname of the device: ")
+    ip = input("Enter the IP address of the device: ")
+    username = input("Enter username: ")
+    password = getpass()
+    lost_mac_safe = int(
+        input("Enter the percentage lost of insignificant amount of MAC addresses: ")
+    )
+    lost_arp_entries = int(
+        input("Enter the percentage lost of insignificant amount of ARP entries: ")
+    )
+    lost_routes = int(
+        input(
+            "Enter the percentage lost of insignificant amount of routes in routing table: "
+        )
+    )
+    testbed_dict = {
+        "devices": {
+            hostname: {
+                "ip": ip,
+                "protocol": "ssh",
+                "username": username,
+                "password": password,
+                "os": "nxos",
+            },
+        }
     }
-}
 
 main_recursion()
