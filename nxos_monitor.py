@@ -72,10 +72,7 @@ def learn_interface(device):
     return intf_up_list
 
 
-def learn_vlan(device):
-
-    # vlan_list = []
-    # num_vlan = 0
+def learn_vlan(device) -> dict:
 
     vlan_object = Vlan(device=device)
     vlan_object.learn()
@@ -84,19 +81,6 @@ def learn_vlan(device):
         vlan_object.info["vlans"].pop("vn_segment_vlan_based_enabled", None)
         vlan_object.info["vlans"].pop("configuration", None)
 
-        # pprint(vlan_object.info)
-        # print(len(list(vlan_object.info["vlans"].keys())))
-        # sys.exit()
-        # for vlan in vlan_object.info["vlans"]:
-        #     if (
-        #         vlan_object.info["vlans"][vlan].get("state", None)
-        #         # and vlan_object.info["vlans"][vlan]["state"] == "active"
-        #     ):
-        #         vlan_list.append(vlan)
-        #         num_vlan = num_vlan + 1
-
-        # return num_vlan, vlan_list
-        # return num_vlan, vlan_object.info["vlans"]
         return vlan_object.info["vlans"]
     else:
         return {}
@@ -194,7 +178,7 @@ def learn_routing(device: dict):
     return num_routes
 
 
-def learn_ospf(device):
+def learn_ospf(device) -> list:
 
     ospf_neighbor_list = []
     ospf_object = Ospf(device=device)
@@ -256,20 +240,6 @@ def learn_ospf(device):
                                        
                                         ospf_neighbor_list.append(neighbor_dict)   
     
-    
-    # with open("ospf_output.txt", "w") as write_obj:
-    #     for key in ospf_neighbor_dict.keys():
-    #         for neighbor in ospf_neighbor_dict[key]:
-    #             pprint(neighbor, stream=write_obj)
-    #             write_obj.write("--------------------------------------------------------\n")
-
-    # with open("ospf_output1_after.txt", "w") as write_obj:
-    #         for neighbor in ospf_neighbor_list:
-    #             pprint(neighbor, stream=write_obj)
-    #             write_obj.write("--------------------------------------------------------\n")
-    # with open("ospf_output2_after.txt", "w") as write_obj:
-    #     pprint(ospf_object.info, stream=write_obj)
-    # # return ospf_neighbor_dict
     return ospf_neighbor_list
 
 
