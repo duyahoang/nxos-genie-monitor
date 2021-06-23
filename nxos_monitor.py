@@ -35,45 +35,56 @@ from pprint import pprint
 
 def make_connection(testbed_dict):
 
-    global first_time_connection
+    # global first_time_connection
     hostname = list(testbed_dict["devices"].keys())[0]
     testbed_nxos = testbed.load(testbed_dict)
     device = testbed_nxos.devices[hostname]
-    if not device.is_connected():
+    # if not device.is_connected():
 
-        if first_time_connection:
-            try:
-                print(
-                    "\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
-                        hostname,
-                        testbed_dict["devices"][hostname]["ip"],
-                        testbed_dict["devices"][hostname]["os"].upper(),
-                        testbed_dict["devices"][hostname]["protocol"].upper(),
-                        22,
+    #     if first_time_connection:
+    #         try:
+    #             print(
+    #                 "\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
+    #                     hostname,
+    #                     testbed_dict["devices"][hostname]["ip"],
+    #                     testbed_dict["devices"][hostname]["os"].upper(),
+    #                     testbed_dict["devices"][hostname]["protocol"].upper(),
+    #                     22,
+    #                 )
+    #             )
+    #             device.connect(log_stdout=False, prompt_recovery=True)
+    #             first_time_connection = False
+    #         except ConnectionError:
+    #             print("\nERROR: Can't establish the connection to the device.")
+    #             print(
+    #                 "Please check the hostname, IP aaddress, username, and password.\n"
+    #             )
+    #             sys.exit()
+    #         # except:
+    #         #     print("Somethings went wrong.")
+    #         #     print("Unexpected error:", sys.exc_info()[0])
+    #         #     sys.exit()
+    #     else:
+    #         print(
+    #             "\nThe program is trying to re-connect to the {} {} device via {} port {}.".format(
+    #                 testbed_dict["devices"][hostname]["ip"],
+    #                 testbed_dict["devices"][hostname]["os"].upper(),
+    #                 testbed_dict["devices"][hostname]["protocol"].upper(),
+    #                 22,
+    #             )
+    #         )
+    #         device.connect(log_stdout=False, prompt_recovery=True)
+
+    if not device.is_connected():
+        print("\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
+                hostname,
+                testbed_dict["devices"][hostname]["ip"],
+                testbed_dict["devices"][hostname]["os"].upper(),
+                testbed_dict["devices"][hostname]["protocol"].upper(),
+                22,
                     )
-                )
-                device.connect(log_stdout=False, prompt_recovery=True)
-                first_time_connection = False
-            except ConnectionError:
-                print("\nERROR: Can't establish the connection to the device.")
-                print(
-                    "Please check the hostname, IP aaddress, username, and password.\n"
-                )
-                sys.exit()
-            # except:
-            #     print("Somethings went wrong.")
-            #     print("Unexpected error:", sys.exc_info()[0])
-            #     sys.exit()
-        else:
-            print(
-                "\nThe program is trying to connect to the {} {} device via {} port {}.".format(
-                    testbed_dict["devices"][hostname]["ip"],
-                    testbed_dict["devices"][hostname]["os"].upper(),
-                    testbed_dict["devices"][hostname]["protocol"].upper(),
-                    22,
-                )
             )
-            device.connect(log_stdout=False, prompt_recovery=True)
+        device.connect(log_stdout=False, prompt_recovery=True)       
 
     return device
 
@@ -222,11 +233,6 @@ def learn_routing(device: dict):
 
 def learn_ospf(device):
 
-    # ospf_neighbor_dict = {
-    #     "virtual_links": [],
-    #     "sham_links": [],
-    #     "interfaces": []
-    # }
     ospf_neighbor_list = []
     ospf_object = Ospf(device=device)
     ospf_object.learn()
@@ -250,8 +256,7 @@ def learn_ospf(device):
                                             "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["address"],
                                             "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["state"]
                                         }
-                        
-                                        # ospf_neighbor_dict["virtual_links"].append(neighbor_dict)
+
                                         ospf_neighbor_list.append(neighbor_dict)
 
                         if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("sham_links", None):
@@ -268,7 +273,7 @@ def learn_ospf(device):
                                             "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["address"],
                                             "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["state"]
                                         }
-                                        # ospf_neighbor_dict["sham_links"].append(neighbor_dict)
+                                       
                                         ospf_neighbor_list.append(neighbor_dict)
 
                         if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("interfaces", None):
@@ -285,16 +290,9 @@ def learn_ospf(device):
                                             "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["address"],
                                             "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["state"]
                                         }
-                                        # ospf_neighbor_dict["interfaces"].append(neighbor_dict)    
+                                       
                                         ospf_neighbor_list.append(neighbor_dict)   
     
-    
-    # if len(ospf_neighbor_dict["virtual_links"]) > 0:
-    #     ospf_neighbor_dict["virtual_links"] = sorted(ospf_neighbor_dict["virtual_links"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["virtual_link"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
-    # if len(ospf_neighbor_dict["sham_links"]) > 0:
-    #     ospf_neighbor_dict["sham_links"] = sorted(ospf_neighbor_dict["sham_links"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["sham_link"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
-    # if len(ospf_neighbor_dict["interfaces"]) > 0:
-    #     ospf_neighbor_dict["interfaces"] = sorted(ospf_neighbor_dict["interfaces"], key= lambda i: (i["vrf"], i["ospf_instance"], i["area"], i["interface"], i["neighbor_router_id"], i["neighbor_interface_address"], i["state"]))
     
     # with open("ospf_output.txt", "w") as write_obj:
     #     for key in ospf_neighbor_dict.keys():
@@ -360,7 +358,7 @@ def parse_all_cmd(device):
     )
     print("The program has parsed all commands in {} seconds.".format(seconds))
     print(
-        "---------------------------------------------------------------------------------------------------"
+        "-----------------------------------------------------------------------------------------------"
     )
 
     return output1, exclude
@@ -378,9 +376,7 @@ def learn_common(device):
         routes_executor = executor.submit(learn_routing, device)
         ospf_executor = executor.submit(learn_ospf, device)
 
-        # num_intf_up, intf_up_list = intf_executor.result()
         intf_up_list = intf_executor.result()
-        # num_vlan, vlan_list = vlan_executor.result()
         vlan_dict = vlan_executor.result()
         total_mac_address = mac_executor.result()
         arp_entries = arp_executor.result()
@@ -389,9 +385,7 @@ def learn_common(device):
         ospf_neighbor_list = ospf_executor.result()
 
     return (
-        # num_intf_up,
         intf_up_list,
-        # num_vlan,
         vlan_dict,
         total_mac_address,
         arp_entries,
@@ -421,30 +415,173 @@ def prepend_line(file_name, line):
         # Rename dummy file as the original file
         os.rename(dummy_file, file_name)
 
+def find_interfaces_down(intf_up_list_original, intf_up_list_after):
+
+    intf_down_list = []
+    for intf in intf_up_list_original:
+        if intf not in intf_up_list_after:
+            intf_down_list.append(intf)
+    
+    delta_intf = len(intf_down_list)
+    percentage_delta_intf = (len(intf_down_list) / len(intf_up_list_original)) * 100
+
+    return intf_down_list, delta_intf, percentage_delta_intf
+
+def find_vlans_change(vlan_dict_original, vlan_dict_after):
+
+    vlan_change_list = []
+    if len(vlan_dict_original) > 0:
+        for vlan_original in list(vlan_dict_original.keys()):
+            if vlan_dict_original[vlan_original]["state"] != "active":
+                continue
+            else:
+                if vlan_original in list(vlan_dict_after.keys()):
+                    if vlan_dict_after[vlan_original]["state"] != "active":
+                            vlan_change_list.append({vlan_original: vlan_dict_after[vlan_original]})
+                else:
+                    vlan_change_list.append({vlan_original: {"state": "Not found in VLAN database"} })
+        
+        delta_vlan = len(vlan_change_list)
+        percentage_delta_vlan = (len(vlan_change_list) / len(vlan_dict_original)) * 100
+
+    return vlan_change_list, delta_vlan, percentage_delta_vlan
+
+def find_ospf_neighbors_change(ospf_neighbor_list_original, ospf_neighbor_list_after):
+    
+    neighbor_change_list = []
+    for neighbor_original in ospf_neighbor_list_original:
+        if neighbor_original["state"] != "full":
+            continue
+        else:
+            count = 0
+            for neighbor_after in ospf_neighbor_list_after:
+                if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                    
+
+                    if neighbor_after.get("virtual_link", None) and neighbor_after["virtual_link"] == neighbor_original["virtual_link"]:
+                    # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["virtual_link"] == neighbor_original["virtual_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                        if neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                        break
+
+                    elif neighbor_after.get("sham_link", None) and neighbor_after["sham_link"] == neighbor_original["sham_link"]:
+                    # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["sham_link"] == neighbor_original["sham_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                        if neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                        break
+
+                    elif neighbor_after.get("interface", None) and neighbor_after["interface"] == neighbor_original["interface"]:
+                    # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["interface"] == neighbor_original["interface"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]:
+                        if neighbor_after["state"] != "full":
+                            neighbor_change_list.append(neighbor_after)
+                        break
+                    
+                    count = 0
+                    continue
+                else:
+                    count = count + 1
+                
+            if count == len(ospf_neighbor_list_after):
+                neighbor_lost = {}
+                for key, value in neighbor_original.items():
+                    if key == "state":
+                        neighbor_lost["state"] = "Not found in OSPF neighbor table"
+                    else:
+                        neighbor_lost[key] = value
+                neighbor_change_list.append(neighbor_lost)       
+    
+    delta_ospf = len(neighbor_change_list)
+    percentage_delta_ospf = (len(neighbor_change_list) / len(ospf_neighbor_list_original)) * 100
+    
+    return neighbor_change_list, delta_ospf, percentage_delta_ospf
+
+def get_testbed():
+
+    print()
+
+    try:
+        if os.path.exists("./databaseconfig.py"):
+            print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
+
+        import databaseconfig as cfg
+
+        print("Imported databaseconfig.py file successfully.")
+        testbed_dict = cfg.testbed_dict
+        lost_mac_safe = cfg.lost_mac_safe
+        lost_arp_safe = cfg.lost_arp_safe
+        lost_routes_safe = cfg.lost_routes_safe
+    except:
+
+        print(
+            "Cannot find or import {}/databaseconfig.py\n".format(
+                os.path.abspath(os.getcwd())
+            )
+        )
+        hostname = input("Enter the hostname of the device: ")
+        ip = input("Enter the IP address of the device: ")
+        username = input("Enter username: ")
+        password = getpass()
+        lost_mac_safe = int(
+            input("Enter the percentage lost of insignificant amount of MAC addresses: ")
+        )
+        lost_arp_safe = int(
+            input("Enter the percentage lost of insignificant amount of ARP entries: ")
+        )
+        lost_routes_safe = int(
+            input(
+                "Enter the percentage lost of insignificant amount of routes in routing table: "
+            )
+        )
+        testbed_dict = {
+            "devices": {
+                hostname: {
+                    "ip": ip,
+                    "protocol": "ssh",
+                    "username": username,
+                    "password": password,
+                    "os": "nxos",
+                },
+            }
+        }
+    
+    lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
+    
+    return testbed_dict, lost_safe_tuple
+
 
 def main():
 
-    # declare global variables that are used by the main function
-    global testbed_dict
-    global have_original
-    global is_detail
-    global intf_up_list_original,  vlan_dict_original, total_mac_address_original, arp_entries_original, num_routes_original, ospf_neighbor_list_original #, num_intf_up_original, num_vlan_original,
-    global all_original
+    testbed_dict, lost_safe_tuple = get_testbed()
 
-    # call make_connection to connect to the device. Passing the global testbed_dict variabl
-    device = make_connection(testbed_dict)
+    # first connection
+    try:
+        device = make_connection(testbed_dict)
+    except ConnectionError:
+        print("\nERROR: Can't establish the connection to the device.")
+        print(
+            "Please check the hostname, IP aaddress, username, and password.\n"
+        )
+        sys.exit()
     if device.is_connected():
         print("The device is connected.")
+    # except:
+    #     print("Somethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
 
-    # if the program have not capture the original snapshot, then it will do it.
-    # if the main function is called again, then it would not re-capture the original snapshot.
-    if not have_original:
+    if os.path.exists("./all_diff.txt"):
+        os.remove("./all_diff.txt")
+
+    have_original = False
+    is_detail = False
+
+    try:
+
+        # take original snapshot
         print("The program is learning device's common information original state...")
         now1 = datetime.now()
         (
-            # num_intf_up_original,
             intf_up_list_original,
-            # num_vlan_original,
             vlan_dict_original,
             total_mac_address_original,
             arp_entries_original,
@@ -463,18 +600,62 @@ def main():
         all_original, exclude = parse_all_cmd(device)
         print("The program has parsed all commands for original state.")
 
-        have_original = True
+        original_snapshot = (
+            intf_up_list_original,
+            vlan_dict_original,
+            total_mac_address_original,
+            arp_entries_original,
+            num_routes_original,
+            ospf_neighbor_list_original,
+            all_original, 
+            exclude)
 
-    print("The programs is beginning to monitor.")
+        have_original = True
+    
+    except KeyboardInterrupt:
+        print("\nThe program has exited before learning device's original state.\n")
+        sys.exit()
+    except ConnectionError:
+        print("\nThe connection to device has been disconnected before learning device's original state.\n")
+        sys.exit()
+    # except:
+    #     print("Somethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
+    # change mode
+    
+    while True:
+        have_original, is_detail = change_mode(have_original, device, testbed_dict, is_detail, lost_safe_tuple, original_snapshot)
+
+def monitor(device, testbed_dict, is_detail, lost_safe_tuple, original_snapshot):
+
+    # check if device is connected    
+    if device.is_connected():
+        print("The device is connected.")
+    else:
+        device = make_connection(testbed_dict)
+    
+    # unpack lost_safe_tuple
+    lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
+    
+    # unpack original snapshot
+    (intf_up_list_original,
+    vlan_dict_original,
+    total_mac_address_original,
+    arp_entries_original,
+    num_routes_original,
+    ospf_neighbor_list_original,
+    all_original, 
+    exclude) = original_snapshot
+
+    print("The programs is beginning to monitor...")
 
     # infinity while loop to keep monitor the device and compare with original snapshot
     while True:
 
         # learn the common information of device's after state
         (
-            # num_intf_up_after,
             intf_up_list_after,
-            # num_vlan_after,
             vlan_dict_after,
             total_mac_address_after,
             arp_entries_after,
@@ -483,96 +664,30 @@ def main():
         ) = learn_common(device)
 
         # find the delta between original and after state of device
-        # delta_intf = num_intf_up_original - num_intf_up_after
-        # delta_vlan = num_vlan_original - num_vlan_after
         delta_mac = total_mac_address_original - total_mac_address_after
         delta_arp = arp_entries_original - arp_entries_after
         delta_routes = num_routes_original - num_routes_after
 
-        # percentage_delta_intf = (delta_intf / num_intf_up_original) * 100
-        # percentage_delta_vlan = (delta_vlan / num_vlan_original) * 100
         percentage_delta_mac = (delta_mac / total_mac_address_original) * 100
         percentage_delta_arp = (delta_arp / arp_entries_original) * 100
         percentage_delta_routes = (delta_routes / num_routes_original) * 100
 
         #find interface changed to down
-        intf_down_list = []
-        for intf in intf_up_list_original:
-            if intf not in intf_up_list_after:
-                intf_down_list.append(intf)
-        
-        delta_intf = len(intf_down_list)
-        percentage_delta_intf = (len(intf_down_list) / len(intf_up_list_original)) * 100
+        intf_down_list, delta_intf, percentage_delta_intf = find_interfaces_down(intf_up_list_original, intf_up_list_after)
         
         #find vlan changed
-        vlan_change_list = []
-        if len(vlan_dict_original) > 0:
-            for vlan_original in list(vlan_dict_original.keys()):
-                if vlan_dict_original[vlan_original]["state"] != "active":
-                    continue
-                else:
-                    if vlan_original in list(vlan_dict_after.keys()):
-                        if vlan_dict_after[vlan_original]["state"] != "active":
-                                vlan_change_list.append({vlan_original: vlan_dict_after[vlan_original]})
-                    else:
-                        vlan_change_list.append({vlan_original: {"state": "Not found in VLAN database"} })
-            
-            delta_vlan = len(vlan_change_list)
-            percentage_delta_vlan = (len(vlan_change_list) / len(vlan_dict_original)) * 100
-        
-
+        vlan_change_list, delta_vlan, percentage_delta_vlan = find_vlans_change(vlan_dict_original, vlan_dict_after)
 
         #find OSPF neighbor changed
-        neighbor_change_list = []
-        for neighbor_original in ospf_neighbor_list_original:
-            if neighbor_original["state"] != "full":
-                continue
-            else:
-                count = 0
-                for neighbor_after in ospf_neighbor_list_after:
-                    if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
-                        
-
-                        if neighbor_after.get("virtual_link", None) and neighbor_after["virtual_link"] == neighbor_original["virtual_link"]:
-                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["virtual_link"] == neighbor_original["virtual_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
-                            if neighbor_after["state"] != "full":
-                                neighbor_change_list.append(neighbor_after)
-                            break
-
-                        elif neighbor_after.get("sham_link", None) and neighbor_after["sham_link"] == neighbor_original["sham_link"]:
-                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["sham_link"] == neighbor_original["sham_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
-                            if neighbor_after["state"] != "full":
-                                neighbor_change_list.append(neighbor_after)
-                            break
-
-                        elif neighbor_after.get("interface", None) and neighbor_after["interface"] == neighbor_original["interface"]:
-                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["interface"] == neighbor_original["interface"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]:
-                            if neighbor_after["state"] != "full":
-                                neighbor_change_list.append(neighbor_after)
-                            break
-                        
-                        count = 0
-                        continue
-                    else:
-                        count = count + 1
-                    
-                if count == len(ospf_neighbor_list_after):
-                    neighbor_lost = {}
-                    for key, value in neighbor_original.items():
-                        if key == "state":
-                            neighbor_lost["state"] = "Not found in OSPF neighbor table"
-                        else:
-                            neighbor_lost[key] = value
-                    neighbor_change_list.append(neighbor_lost)       
+        neighbor_change_list, delta_ospf, percentage_delta_ospf = find_ospf_neighbors_change(ospf_neighbor_list_original, ospf_neighbor_list_after)
                             
         if (
             len(intf_down_list) == 0
-            # and len(vlan_list_after) >= len(vlan_list_original)
             and len(vlan_change_list) == 0
             and len(neighbor_change_list) == 0
             and percentage_delta_mac < lost_mac_safe
-            and percentage_delta_arp < lost_arp_entries
-            and percentage_delta_routes < lost_routes
+            and percentage_delta_arp < lost_arp_safe
+            and percentage_delta_routes < lost_routes_safe
         ):
             print(
                 "\n---------------------------------- {} --------------------------------------".format(
@@ -603,19 +718,19 @@ def main():
                 )
             )
             print("List of the vlans changed to down:")
-            # for vlan in vlan_list_original:
-            #     if vlan not in vlan_list_after:
-            #         print("VLAN {}".format(vlan))
             for vlan_dict in vlan_change_list:
                 vlan = list(vlan_dict.keys())[0]
                 state = vlan_dict[vlan]["state"]
                 print("VLAN {} - state: {}".format(vlan, state))
-            
             print()
             
+            print("There are {} ({:.2f}%) OSPF neighbors' state have been changed.".format(
+                    delta_ospf, percentage_delta_ospf
+                )
+            )
+            print("List of the OSPF neighbors' state have been changed: ")
             for neighbor_dict in neighbor_change_list:
                 pprint(neighbor_dict)
-            
             print()
             
             print(
@@ -636,6 +751,7 @@ def main():
                 )
             )
         print()
+        
         if is_detail:
 
             print("\nThe porgram is parsing all commands.")
@@ -649,24 +765,24 @@ def main():
 
             if not (str(diff) == ""):
 
-                line_string = "\n------------------------------------------ {} --------------------------------------\n\n{}\n\n------------------------------------------------------------------------------------\n".format(
+                line_string = "\n------------------------------------------ {} --------------------------------------\n\n{}\n\n------------------------------------------------------------------------------------------------------\n".format(
                     datetime.now().strftime("%Y-%b-%d %X"), diff
                 )
 
             else:
-                line_string = "\n------------------------------------------ {} --------------------------------------\n\n{}\n\n------------------------------------------------------------------------------------\n".format(
+                line_string = "\n------------------------------------------ {} --------------------------------------\n\n{}\n\n------------------------------------------------------------------------------------------------------\n".format(
                     datetime.now().strftime("%Y-%b-%d %X"), "There is no change."
                 )
 
             prepend_line("all_diff.txt", line_string)
+        print(
+        "-----------------------------------------------------------------------------------------------"
+        )
 
-
-def main_recursion():
-
-    global have_original, is_detail
+def change_mode(have_original, device, testbed_dict, is_detail, lost_safe_tuple, original_snapshot):
 
     try:
-        main()
+        monitor(device, testbed_dict, is_detail, lost_safe_tuple, original_snapshot)
     except KeyboardInterrupt:
 
         if not have_original:
@@ -714,83 +830,18 @@ def main_recursion():
                 else:
                     is_detail = False
 
-            main_recursion()
-
     except ConnectionError:
         print("\nThe connection is disconnected. The device may be reloading.")
         print("The program will try to re-connect after 30 seconds.\n")
         sleep(30)
-        main_recursion()
-
+   
     # except:
     #     print("Somethings went wrong.")
     #     print("Unexpected error:", sys.exc_info()[0])
     #     sys.exit()
+    
+    return have_original, is_detail
 
 
-if os.path.exists("./all_diff.txt"):
-    os.remove("./all_diff.txt")
 
-have_original = False
-is_detail = False
-
-# num_intf_up_original = 0
-intf_up_list_original = []
-# num_vlan_original = 0
-vlan_dict_original = {}
-total_mac_address_original = 0
-arp_entries_original = 0
-num_routes_original = 0
-ospf_neighbor_list_original = []
-all_original = {}
-
-first_time_connection = True
-
-print()
-
-try:
-    if os.path.exists("./databaseconfig.py"):
-        print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
-
-    import databaseconfig as cfg
-
-    print("Imported databaseconfig.py file successfully.")
-    testbed_dict = cfg.testbed_dict
-    lost_mac_safe = cfg.lost_mac_safe
-    lost_arp_entries = cfg.lost_arp_entries
-    lost_routes = cfg.lost_routes
-except:
-
-    print(
-        "Cannot find or import {}/databaseconfig.py\n".format(
-            os.path.abspath(os.getcwd())
-        )
-    )
-    hostname = input("Enter the hostname of the device: ")
-    ip = input("Enter the IP address of the device: ")
-    username = input("Enter username: ")
-    password = getpass()
-    lost_mac_safe = int(
-        input("Enter the percentage lost of insignificant amount of MAC addresses: ")
-    )
-    lost_arp_entries = int(
-        input("Enter the percentage lost of insignificant amount of ARP entries: ")
-    )
-    lost_routes = int(
-        input(
-            "Enter the percentage lost of insignificant amount of routes in routing table: "
-        )
-    )
-    testbed_dict = {
-        "devices": {
-            hostname: {
-                "ip": ip,
-                "protocol": "ssh",
-                "username": username,
-                "password": password,
-                "os": "nxos",
-            },
-        }
-    }
-
-main_recursion()
+main()
