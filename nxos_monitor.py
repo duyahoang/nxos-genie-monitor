@@ -302,11 +302,13 @@ def learn_ospf(device):
     #             pprint(neighbor, stream=write_obj)
     #             write_obj.write("--------------------------------------------------------\n")
 
-    with open("ospf_output.txt", "w") as write_obj:
-            for neighbor in ospf_neighbor_list:
-                pprint(neighbor, stream=write_obj)
-                write_obj.write("--------------------------------------------------------\n")
-    # return ospf_neighbor_dict
+    # with open("ospf_output1_after.txt", "w") as write_obj:
+    #         for neighbor in ospf_neighbor_list:
+    #             pprint(neighbor, stream=write_obj)
+    #             write_obj.write("--------------------------------------------------------\n")
+    # with open("ospf_output2_after.txt", "w") as write_obj:
+    #     pprint(ospf_object.info, stream=write_obj)
+    # # return ospf_neighbor_dict
     return ospf_neighbor_list
 
 
@@ -526,20 +528,43 @@ def main():
             if neighbor_original["state"] != "full":
                 continue
             else:
+                count = 0
                 for neighbor_after in ospf_neighbor_list_after:
-                    if neighbor_after.get("virtual_link"):
-                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["virtual_link"] == neighbor_original["virtual_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
-                            neighbor_change_list.append(neighbor_after)
-                            continue
-                    if neighbor_after.get("sham_link"):
-                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["sham_link"] == neighbor_original["sham_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
-                            neighbor_change_list.append(neighbor_after)
-                            continue
-                    if neighbor_after.get("interface"):
-                        if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["interface"] == neighbor_original["interface"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"] and neighbor_after["state"] != "full":
-                            neighbor_change_list.append(neighbor_after)
-                            continue
-            
+                    if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                        
+
+                        if neighbor_after.get("virtual_link", None) and neighbor_after["virtual_link"] == neighbor_original["virtual_link"]:
+                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["virtual_link"] == neighbor_original["virtual_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                            if neighbor_after["state"] != "full":
+                                neighbor_change_list.append(neighbor_after)
+                            break
+
+                        elif neighbor_after.get("sham_link", None) and neighbor_after["sham_link"] == neighbor_original["sham_link"]:
+                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["sham_link"] == neighbor_original["sham_link"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]: 
+                            if neighbor_after["state"] != "full":
+                                neighbor_change_list.append(neighbor_after)
+                            break
+
+                        elif neighbor_after.get("interface", None) and neighbor_after["interface"] == neighbor_original["interface"]:
+                        # if neighbor_after["vrf"] == neighbor_original["vrf"] and neighbor_after["ospf_instance"] == neighbor_original["ospf_instance"] and neighbor_after["area"] == neighbor_original["area"] and neighbor_after["interface"] == neighbor_original["interface"] and neighbor_after["neighbor_router_id"] == neighbor_original["neighbor_router_id"]:
+                            if neighbor_after["state"] != "full":
+                                neighbor_change_list.append(neighbor_after)
+                            break
+                        
+                        count = 0
+                        continue
+                    else:
+                        count = count + 1
+                    
+                if count == len(ospf_neighbor_list_after):
+                    neighbor_lost = {}
+                    for key, value in neighbor_original.items():
+                        if key == "state":
+                            neighbor_lost["state"] = "Not found in OSPF neighbor table"
+                        else:
+                            neighbor_lost[key] = value
+                    neighbor_change_list.append(neighbor_lost)       
+                            
         if (
             len(intf_down_list) == 0
             # and len(vlan_list_after) >= len(vlan_list_original)
@@ -585,6 +610,7 @@ def main():
                 vlan = list(vlan_dict.keys())[0]
                 state = vlan_dict[vlan]["state"]
                 print("VLAN {} - state: {}".format(vlan, state))
+            
             print()
             
             for neighbor_dict in neighbor_change_list:
