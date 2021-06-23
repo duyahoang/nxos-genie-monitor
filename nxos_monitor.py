@@ -35,46 +35,10 @@ from pprint import pprint
 
 def make_connection(testbed_dict):
 
-    # global first_time_connection
     hostname = list(testbed_dict["devices"].keys())[0]
     testbed_nxos = testbed.load(testbed_dict)
     device = testbed_nxos.devices[hostname]
-    # if not device.is_connected():
-
-    #     if first_time_connection:
-    #         try:
-    #             print(
-    #                 "\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
-    #                     hostname,
-    #                     testbed_dict["devices"][hostname]["ip"],
-    #                     testbed_dict["devices"][hostname]["os"].upper(),
-    #                     testbed_dict["devices"][hostname]["protocol"].upper(),
-    #                     22,
-    #                 )
-    #             )
-    #             device.connect(log_stdout=False, prompt_recovery=True)
-    #             first_time_connection = False
-    #         except ConnectionError:
-    #             print("\nERROR: Can't establish the connection to the device.")
-    #             print(
-    #                 "Please check the hostname, IP aaddress, username, and password.\n"
-    #             )
-    #             sys.exit()
-    #         # except:
-    #         #     print("Somethings went wrong.")
-    #         #     print("Unexpected error:", sys.exc_info()[0])
-    #         #     sys.exit()
-    #     else:
-    #         print(
-    #             "\nThe program is trying to re-connect to the {} {} device via {} port {}.".format(
-    #                 testbed_dict["devices"][hostname]["ip"],
-    #                 testbed_dict["devices"][hostname]["os"].upper(),
-    #                 testbed_dict["devices"][hostname]["protocol"].upper(),
-    #                 22,
-    #             )
-    #         )
-    #         device.connect(log_stdout=False, prompt_recovery=True)
-
+    
     if not device.is_connected():
         print("\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
                 hostname,
@@ -87,7 +51,6 @@ def make_connection(testbed_dict):
         device.connect(log_stdout=False, prompt_recovery=True)       
 
     return device
-
 
 def learn_interface(device):
 
