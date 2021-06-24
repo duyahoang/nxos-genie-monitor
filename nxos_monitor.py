@@ -181,7 +181,7 @@ def learn_routing(device) -> int:
     return num_routes
 
 
-def learn_ospf(device) -> list(dict):
+def learn_ospf(device) -> list:
 
     ospf_neighbor_list = []
     ospf_object = Ospf(device=device)
@@ -355,7 +355,7 @@ def prepend_line(file_name, line):
         os.rename(dummy_file, file_name)
 
 
-def find_interfaces_down(intf_up_list_original: list, intf_up_list_after: list) -> tuple(list, float, float):
+def find_interfaces_down(intf_up_list_original: list, intf_up_list_after: list) -> tuple:
 
     intf_down_list = []
     for intf in intf_up_list_original:
@@ -369,7 +369,7 @@ def find_interfaces_down(intf_up_list_original: list, intf_up_list_after: list) 
     return (intf_down_list, delta_intf, percentage_delta_intf)
 
 
-def find_vlans_change(vlan_dict_original: dict, vlan_dict_after: dict) -> tuple(list, float, float):
+def find_vlans_change(vlan_dict_original: dict, vlan_dict_after: dict) -> tuple:
 
     vlan_change_list = []
     if len(vlan_dict_original) > 0:
@@ -394,7 +394,7 @@ def find_vlans_change(vlan_dict_original: dict, vlan_dict_after: dict) -> tuple(
     return (vlan_change_list, delta_vlan, percentage_delta_vlan)
 
 
-def find_ospf_neighbors_change(ospf_neighbor_list_original: list, ospf_neighbor_list_after: list) -> tuple(list, float, float):
+def find_ospf_neighbors_change(ospf_neighbor_list_original: list, ospf_neighbor_list_after: list) -> tuple:
 
     neighbor_change_list = []
     for neighbor_original in ospf_neighbor_list_original:
@@ -461,7 +461,7 @@ def find_ospf_neighbors_change(ospf_neighbor_list_original: list, ospf_neighbor_
     return (neighbor_change_list, delta_ospf, percentage_delta_ospf)
 
 
-def get_testbed() -> tuple(dict, tuple):
+def get_testbed() -> tuple:
 
     print()
 
@@ -517,7 +517,7 @@ def get_testbed() -> tuple(dict, tuple):
     return (testbed_dict, lost_safe_tuple)
 
 
-def find_delta(original, after) -> tuple(float, float):
+def find_delta(original, after) -> tuple:
 
     delta = 0
     percentage_delta_mac = 0
