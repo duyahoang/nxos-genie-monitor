@@ -70,7 +70,6 @@ def learn_interface(device) -> list:
             intf_up_list.append(intf)
             num_intf_up = num_intf_up + 1
 
-    # return (num_intf_up, intf_up_list)
     return intf_up_list
 
 
@@ -83,7 +82,9 @@ def learn_vlan(device) -> dict:
         vlan_object.info["vlans"].pop("vn_segment_vlan_based_enabled", None)
         vlan_object.info["vlans"].pop("configuration", None)
 
-        return vlan_object.info["vlans"]
+        vlan_dict = dict(vlan_object.info["vlans"])
+
+        return vlan_dict
     else:
         return {}
 
@@ -100,7 +101,9 @@ def learn_fdb(device) -> int:
             total_mac_addresses = total_mac_addresses + len(
                 fdb_object.info["mac_table"]["vlans"][key]["mac_addresses"]
             )
+
         return total_mac_addresses
+
     except:
         return total_mac_addresses
 
@@ -466,7 +469,10 @@ def get_testbed() -> tuple:
     print()
 
     try:
-        if os.path.exists("./databaseconfig.py"):
+
+        dir_running_script = os.path.dirname(os.path.realpath(__file__))
+
+        if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
             print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
 
         import databaseconfig as cfg
@@ -777,7 +783,7 @@ def monitor(device, testbed_dict, is_detail, lost_safe_tuple, original_snapshot)
 
             prepend_line("all_diff.txt", line_string)
         print(
-            "-----------------------------------------------------------------------------------------------"
+            "----------------------------------------------------------------------------------------------"
         )
 
 
