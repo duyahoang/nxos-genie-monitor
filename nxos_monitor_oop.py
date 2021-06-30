@@ -737,7 +737,7 @@ def get_testbed() -> tuple:
         if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
             print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
 
-        import databaseconfig1 as cfg
+        import databaseconfig as cfg
 
         print("Imported databaseconfig.py file successfully.")
 
