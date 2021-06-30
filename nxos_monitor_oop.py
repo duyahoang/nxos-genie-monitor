@@ -42,109 +42,6 @@ def decorator_instance(class_monitor):
     return class_monitor
 
 
-def get_testbed() -> tuple:
-
-    print()
-
-    try:
-
-        dir_running_script = os.path.dirname(os.path.realpath(__file__))
-
-        if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
-            print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
-
-        import databaseconfig as cfg
-
-        print("Imported databaseconfig.py file successfully.")
-        testbed_dict = cfg.testbed_dict
-        lost_mac_safe = cfg.lost_mac_safe
-        lost_arp_safe = cfg.lost_arp_safe
-        lost_routes_safe = cfg.lost_routes_safe
-        dir_output = cfg.dir_output
-        while not os.path.exists("{}".format(dir_output)):
-            print("{} directory does not exist.".format(dir_output))
-            dir_output = input(
-                "Enter the directory that will store the output files (e.g. /home/script): ")
-    except:
-
-        print(
-            "Cannot find or import {}/databaseconfig.py\n".format(
-                os.path.abspath(os.getcwd())
-            )
-        )
-        hostname = input("Enter the hostname of the device: ")
-        ip = input("Enter the IP address of the device: ")
-        username = input("Enter username: ")
-        password = getpass()
-        while True:
-            lost_mac_safe = input(
-                "Enter the percentage lost of insignificant amount of MAC addresses: "
-            )
-            try:
-                lost_mac_safe = int(lost_mac_safe)
-                break
-            except ValueError:
-                try:
-                    lost_mac_safe = float(lost_mac_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
-
-        while True:
-            lost_arp_safe = input(
-                "Enter the percentage lost of insignificant amount of ARP entries: "
-            )
-            try:
-                lost_arp_safe = int(lost_arp_safe)
-                break
-            except ValueError:
-                try:
-                    lost_arp_safe = float(lost_arp_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
-
-        while True:
-            lost_routes_safe = input(
-                "Enter the percentage lost of insignificant amount of routes in routing table: "
-            )
-            try:
-                lost_routes_safe = int(lost_routes_safe)
-                break
-            except ValueError:
-                try:
-                    lost_routes_safe = float(lost_routes_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
-
-        testbed_dict = {
-            "devices": {
-                hostname: {
-                    "ip": ip,
-                    "protocol": "ssh",
-                    "username": username,
-                    "password": password,
-                    "os": "nxos",
-                },
-            }
-        }
-
-        dir_output = input(
-            "Enter the directory that will store the output files (e.g. /home/script): ")
-
-        while not os.path.exists("{}".format(dir_output)):
-            print("{} directory does not exist.".format(dir_output))
-            dir_output = input(
-                "Enter the directory that will store the output files (e.g. /home/script): ")
-
-    if len(dir_output) > 1 and dir_output[-1] == "/":
-        dir_output = dir_output[:-1]
-    lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
-
-    return (testbed_dict, lost_safe_tuple, dir_output)
-
-
 class Device:
     def __init__(self, testbed_dict) -> None:
         self.testbed_dict = testbed_dict
@@ -748,6 +645,191 @@ class OspfMonitor:
             return None
 
 
+class AllDetail:
+    def __init__(self, device):
+
+        self.device = device
+
+    def parse_all_cmd(self):
+
+        cmd_list = []
+        cmd_error_list = []
+
+        output = self.device.parse("all")
+
+        for cmd in output:
+            if "errored" in output[cmd].keys():
+                cmd_error_list.append(cmd)
+        for cmd_error in cmd_error_list:
+            del output[cmd_error]
+
+        cmd_list = list(output.keys())
+
+        for i in range(len(cmd_list)):
+            if i == 0:
+                exclude = get_parser_exclude(cmd_list[i], self.device)
+            else:
+                exclude.extend(get_parser_exclude(cmd_list[i], self.device))
+
+        exclude.extend(
+            [
+                "idle_percent",
+                "kernel_percent",
+                "user_percent",
+                "bpdu_sent",
+                "time_since_topology_change",
+                "show users",
+                "current_temp_celsius",
+                "fwd_id",
+                "table_id",
+                "vrf_id ",
+                "counters",
+            ]
+        )
+
+        return output, exclude
+
+    def original(self):
+        self.all_detail_original, self.exclude = self.parse_all_cmd()
+
+    def current(self):
+        self.all_detail_current, self.exclude = self.parse_all_cmd()
+        self.diff_all_details = self.__find_diff_all_detail()
+
+    def __find_diff_all_detail(self):
+        diff = Diff(self.all_detail_original,
+                    self.all_detail_current, exclude=self.exclude)
+        diff.findDiff()
+        return diff
+
+    def is_changed(self):
+        if hasattr(self, "diff"):
+            if not (str(self.diff) == ""):
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def diff(self):
+        if hasattr(self, "diff_all_details"):
+            string = "\n{} {} {}\n".format("-"*40,
+                                           datetime.now().strftime("%Y-%b-%d %X"), "-"*40)
+            if not (str(self.diff_all_details) == ""):
+                string = string + "   {}\n".format(self.diff_all_details)
+            else:
+                string = string + "None\n"
+
+            string = string + "\n{}".format("-"*102)
+            return string
+        else:
+            return None
+
+
+def get_testbed() -> tuple:
+
+    print()
+
+    try:
+
+        dir_running_script = os.path.dirname(os.path.realpath(__file__))
+
+        if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
+            print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
+
+        import databaseconfig as cfg
+
+        print("Imported databaseconfig.py file successfully.")
+
+        testbed_dict = cfg.testbed_dict
+        lost_mac_safe = cfg.lost_mac_safe
+        lost_arp_safe = cfg.lost_arp_safe
+        lost_routes_safe = cfg.lost_routes_safe
+        dir_output = cfg.dir_output
+        while not os.path.exists("{}".format(dir_output)):
+            print("{} directory does not exist.".format(dir_output))
+            dir_output = input(
+                "Enter the directory that will store the output files (e.g. /home/script): ")
+    except:
+
+        print(
+            "Cannot find or import {}/databaseconfig.py\n".format(
+                os.path.abspath(os.getcwd())
+            )
+        )
+        hostname = input("Enter the hostname of the device: ")
+        ip = input("Enter the IP address of the device: ")
+        username = input("Enter username: ")
+        password = getpass()
+        while True:
+            lost_mac_safe = input(
+                "Enter the percentage lost of insignificant amount of MAC addresses: "
+            )
+            try:
+                lost_mac_safe = int(lost_mac_safe)
+                break
+            except ValueError:
+                try:
+                    lost_mac_safe = float(lost_mac_safe)
+                    break
+                except ValueError:
+                    print("You have entered invalid value. Please enter a number.")
+
+        while True:
+            lost_arp_safe = input(
+                "Enter the percentage lost of insignificant amount of ARP entries: "
+            )
+            try:
+                lost_arp_safe = int(lost_arp_safe)
+                break
+            except ValueError:
+                try:
+                    lost_arp_safe = float(lost_arp_safe)
+                    break
+                except ValueError:
+                    print("You have entered invalid value. Please enter a number.")
+
+        while True:
+            lost_routes_safe = input(
+                "Enter the percentage lost of insignificant amount of routes in routing table: "
+            )
+            try:
+                lost_routes_safe = int(lost_routes_safe)
+                break
+            except ValueError:
+                try:
+                    lost_routes_safe = float(lost_routes_safe)
+                    break
+                except ValueError:
+                    print("You have entered invalid value. Please enter a number.")
+
+        testbed_dict = {
+            "devices": {
+                hostname: {
+                    "ip": ip,
+                    "protocol": "ssh",
+                    "username": username,
+                    "password": password,
+                    "os": "nxos",
+                },
+            }
+        }
+
+        dir_output = input(
+            "Enter the directory that will store the output files (e.g. /home/script): ")
+
+        while not os.path.exists("{}".format(dir_output)):
+            print("{} directory does not exist.".format(dir_output))
+            dir_output = input(
+                "Enter the directory that will store the output files (e.g. /home/script): ")
+
+    if len(dir_output) > 1 and dir_output[-1] == "/":
+        dir_output = dir_output[:-1]
+    lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
+
+    return (testbed_dict, lost_safe_tuple, dir_output)
+
+
 def runThreadPoolExecutor(instance_monitor_dict, method_name):
 
     executor_dict = dict()
@@ -822,7 +904,7 @@ def main():
 
     try:
         if not have_original:
-            print("The program is learning {}'s common information original state...".format(
+            print("The program is learning {}'s common information for the original state...".format(
                 nxos_3k.device.hostname))
             now1 = datetime.now()
             runThreadPoolExecutor(instance_monitor_dict, "original")
@@ -830,6 +912,18 @@ def main():
 
             print(
                 "The common information for original state has learned in {:.2f} seconds.".format(
+                    (now2 - now1).total_seconds()
+                )
+            )
+
+            print("The program is learning {}'s all details for the original state...".format(
+                nxos_3k.device.hostname))
+            now1 = datetime.now()
+            alldetail_instance = AllDetail(nxos_3k.device)
+            alldetail_instance.original()
+            now2 = datetime.now()
+            print(
+                "The all details for original state has learned in {:.2f} seconds.".format(
                     (now2 - now1).total_seconds()
                 )
             )
@@ -860,7 +954,9 @@ def main():
         try:
             if not nxos_3k.device.is_connected():
                 nxos_3k.make_connection()
+
             runThreadPoolExecutor(instance_monitor_dict, "current")
+
             string = ""
             string = string + "\n{} {} {}\n".format("-"*40,
                                                     datetime.now().strftime("%Y-%b-%d %X"), "-"*40)
@@ -882,6 +978,18 @@ def main():
             print(string)
             prepend_line(
                 "{}/common_diff_output.txt".format(dir_output), string)
+
+            if is_detail:
+                print("\nThe porgram is parsing all commands...")
+                alldetail_instance.current()
+                string = alldetail_instance.diff()
+                print(
+                    "The program has parsed all commands. Please check the differences in {}/all_diff_output.txt file.".format(
+                        dir_output)
+                )
+                print("{}\n".format("-"*102))
+                prepend_line(
+                    "{}/all_diff_output.txt".format(dir_output), string)
 
         except KeyboardInterrupt:
             print("\nYou have paused the program.\n")
@@ -923,8 +1031,6 @@ def main():
                     is_detail = True
                 else:
                     is_detail = False
-
-            print("is_detail: {}".format(is_detail))
 
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
