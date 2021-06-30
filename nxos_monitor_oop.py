@@ -737,7 +737,7 @@ def get_testbed() -> tuple:
         if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
             print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
 
-        import databaseconfig as cfg
+        import databaseconfig1 as cfg
 
         print("Imported databaseconfig.py file successfully.")
 
@@ -883,11 +883,11 @@ def main():
     else:
         print("{} is not connected.".format(nxos_3k.device.hostname))
 
-    if os.path.exists("{}/all_diff_output.txt".format(dir_output)):
+    if os.path.isfile("{}/all_diff_output.txt".format(dir_output)):
         os.remove("{}/all_diff_output.txt".format(dir_output))
 
-    if os.path.exists("{}./common_diff_output.txt".format(dir_output)):
-        os.remove("{}./common_diff_output.txt".format(dir_output))
+    if os.path.isfile("{}/common_diff_output.txt".format(dir_output)):
+        os.remove("{}/common_diff_output.txt".format(dir_output))
 
     # print(class_list)
     instance_monitor_dict = dict()
@@ -984,7 +984,7 @@ def main():
                 alldetail_instance.current()
                 string = alldetail_instance.diff()
                 print(
-                    "The program has parsed all commands. Please check the differences in {}/all_diff_output.txt file.".format(
+                    "The program has finished parsing all commands.\nPlease check the differences in {}/all_diff_output.txt file.".format(
                         dir_output)
                 )
                 print("{}\n".format("-"*102))
