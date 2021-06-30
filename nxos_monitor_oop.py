@@ -1039,9 +1039,9 @@ def main():
 
 
 if __name__ == '__main__':
-    # try:
-    main()
-    # except:
-    #     print("\nSomethings went wrong.")
-    #     print("Unexpected error:", sys.exc_info()[0])
-    #     sys.exit()
+    try:
+        main()
+    except:
+        print("\nSomethings went wrong.")
+        print("Unexpected error:", sys.exc_info()[0])
+        sys.exit()
