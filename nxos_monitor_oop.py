@@ -1053,7 +1053,7 @@ def main():
 
 if __name__ == '__main__':
     try:
-
+        # Uncomment two lines below to import and decorate class from extended.py
         # from extended import ExtendedFeature
         # ExtendedFeature = decorator_instance(ExtendedFeature)
 
