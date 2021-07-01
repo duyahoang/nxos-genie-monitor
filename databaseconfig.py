@@ -7,34 +7,24 @@
 # Description: This is databaseconfig.py for the input information used by the nxos_monitor tool.
 #
 # Examples:
-# testbed_dict = {
-#     "router1": {
-#         "hostname": {
-#             "ip": "192.168.1.1",
-#             "protocol": "ssh",
-#             "username": "admin",
-#             "password": "Cisco",
-#             "os": "nxos",
-#         },
-#     }
+# input_dict = {
+#     "hostname": "router1"         <--- need to be changed
+#     "ip": "192.168.1.1",          <--- need to be changed
+#     "username": "admin",          <--- need to be changed
+#     "password": "Cisco",          <--- need to be changed
 # }
+#
+# lost_mac_safe = 30                <--- need to be changed
+# lost_arp_safe = 30                <--- need to be changed
+# lost_routes_safe = 5              <--- need to be changed
+#
+# dir_output = "/home/script"       <--- need to be changed
 
-# lost_mac_safe = 30
-# lost_arp_safe = 30
-# lost_routes_safe = 5
-
-# dir_output = "/home/script"
-
-testbed_dict = {
-    "devices": {
-        "hostname": {
-            "ip": "a.b.c.d",
-            "protocol": "ssh",
-            "username": "username",
-            "password": "password",
-            "os": "nxos",
-        },
-    }
+input_dict = {
+    "hostname": "something",
+    "ip": "a.b.c.d",
+    "username": "username",
+    "password": "password",
 }
 
 

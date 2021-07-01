@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-# this is a new line
 # Cisco System, Inc
 # Author: Duy Hoang
 # Mentors: Andy Jaramillo, Nathan Hemingway
@@ -11,8 +10,8 @@
 # Using Ctrl-C to pause the program to change the mode or exit the program.
 
 # Requirement:
-# python 3.8
-# pip install genie[library]
+# python 3.6
+# pip install pyats[library]
 
 from time import sleep
 from genie import testbed
@@ -31,7 +30,6 @@ import concurrent.futures
 import sys
 import re
 from getpass import getpass
-from pprint import pprint
 
 
 class_list = list()
@@ -64,8 +62,6 @@ class Device:
                 )
             )
             self.device.connect(log_stdout=False, prompt_recovery=True)
-
-        # self.device = device
 
 
 @decorator_instance
@@ -286,7 +282,7 @@ class FdbMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_mac") and hasattr(self, "percentage_delta_mac"):
-            if self.percentage_delta_mac > 0:
+            if self.percentage_delta_mac > lost_mac_safe:
                 return True
             else:
                 return False
@@ -375,7 +371,7 @@ class ArpMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_arp") and hasattr(self, "percentage_delta_arp"):
-            if self.percentage_delta_arp > 0:
+            if self.percentage_delta_arp > lost_arp_safe:
                 return True
             else:
                 return False
@@ -445,7 +441,7 @@ class RoutingMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_routes") and hasattr(self, "percentage_delta_routes"):
-            if self.percentage_delta_routes > 0:
+            if self.percentage_delta_routes > lost_routes_safe:
                 return True
             else:
                 return False
@@ -737,11 +733,24 @@ def get_testbed() -> tuple:
         if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
             print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
 
-        import databaseconfig as cfg
+        import databaseconfig_bak as cfg
 
         print("Imported databaseconfig.py file successfully.")
 
-        testbed_dict = cfg.testbed_dict
+        input_dict = cfg.input_dict
+
+        testbed_dict = {
+            "devices": {
+                input_dict["hostname"]: {
+                    "ip": input_dict["ip"],
+                    "protocol": "ssh",
+                    "username": input_dict["username"],
+                    "password": input_dict["password"],
+                    "os": "nxos",
+                },
+            }
+        }
+
         lost_mac_safe = cfg.lost_mac_safe
         lost_arp_safe = cfg.lost_arp_safe
         lost_routes_safe = cfg.lost_routes_safe
@@ -864,10 +873,19 @@ def prepend_line(file_name, line):
         os.rename(dummy_file, file_name)
 
 
+lost_mac_safe = 0
+lost_arp_safe = 0
+lost_routes_safe = 0
+
+
 def main():
 
     testbed_dict, lost_safe_tuple, dir_output = get_testbed()
+
     nxos_3k = Device(testbed_dict)
+
+    global lost_mac_safe, lost_arp_safe, lost_routes_safe
+    lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
 
     try:
         if not nxos_3k.device.is_connected():
@@ -931,7 +949,7 @@ def main():
             have_original = True
 
     except KeyboardInterrupt:
-        print("\nThe program has exited before learning 's original state.\n".format(
+        print("\nThe program has exited before learning's original state.\n".format(
             nxos_3k.device.hostname))
         sys.exit()
 
@@ -941,11 +959,6 @@ def main():
                 nxos_3k.device.hostname)
         )
         sys.exit()
-
-    # def decorator_output(output_func):
-
-    #     class_list.append(class_monitor)
-    #     return class_monitor
 
     lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
     print("The programs is beginning to monitor {}...".format(
@@ -1041,6 +1054,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except SystemExit:
+        sys.exit()
     except:
         print("\nSomethings went wrong.")
         print("Unexpected error:", sys.exc_info()[0])
