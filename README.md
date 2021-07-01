@@ -50,7 +50,7 @@ This is an example of how to list things you need to use the software and how to
 * Python 3.6 and above
 * pip
   ```sh
-  pip install genie[library]
+  pip install pyats[library]
   ```
 
 ### Installation
@@ -61,7 +61,7 @@ This is an example of how to list things you need to use the software and how to
    ```
 2. Install PyATS/Genie packages
    ```sh
-   pip install genie[library]
+   pip install pyats[library]
    ```
 
 
