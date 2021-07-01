@@ -1,4 +1,4 @@
-class ExtendedFeature:
+class ExtraFeature:
     # __init__ need to have two arguments. The device will be passed when create an instance.
     def __init__(self, device) -> None:
         pass
