@@ -1053,6 +1053,10 @@ def main():
 
 if __name__ == '__main__':
     try:
+
+        # from extended import ExtendedFeature
+        # ExtendedFeature = decorator_instance(ExtendedFeature)
+
         main()
     except SystemExit:
         sys.exit()
