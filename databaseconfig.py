@@ -7,6 +7,7 @@
 # Description: This is databaseconfig.py for the input information used by the nxos_monitor tool.
 #
 # Examples:
+#
 # input_dict = {
 #     "hostname": "router1"         <--- need to be changed
 #     "ip": "192.168.1.1",          <--- need to be changed
