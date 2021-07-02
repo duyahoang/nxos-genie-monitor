@@ -22,6 +22,6 @@ class ExtraFeature:
     def diff(self) -> str:
         # This function should return a string that describes the differences between the original and current state.
         if self.current_state != self.original_state:
-            return "\nThis is from Extended feature.\nThere is a difference between the original and current state.\n"
+            return "\nThis is from extra feature.\n"
         else:
-            return "The original and current state are same.\n"
+            return "\nBad\n"

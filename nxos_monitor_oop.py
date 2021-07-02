@@ -733,7 +733,7 @@ def get_testbed() -> tuple:
         if os.path.exists("{}/databaseconfig.py".format(dir_running_script)):
             print("Found {}/databaseconfig.py".format(os.path.abspath(os.getcwd())))
 
-        import databaseconfig_bak as cfg
+        import databaseconfig as cfg
 
         print("Imported databaseconfig.py file successfully.")
 
@@ -1053,9 +1053,13 @@ def main():
 
 if __name__ == '__main__':
     try:
-        # Uncomment two lines below to import and decorate class from extended.py
-        # from extra import ExtraFeature
-        # ExtraFeature = decorator_instance(ExtraFeature)
+        # Uncomment six lines below to import and decorate classes from extra.py
+        # import inspect
+        # import extra
+        # extra_class_list = [m[1] for m in inspect.getmembers(
+        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+        # for extraClass in extra_class_list:
+        #     extraClass = decorator_instance(extraClass)
 
         main()
     except SystemExit:
