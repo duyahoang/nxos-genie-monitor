@@ -626,7 +626,8 @@ class OspfMonitor:
 
     def diff(self):
         if hasattr(self, "neighbor_change_list") and hasattr(self, "delta_ospf") and hasattr(self, "percentage_delta_ospf"):
-            string = "List of the OSPF neighbors' state have been changed:\n"
+            string = "There are {} OSPF neighbors' state have been changed.\nList of the OSPF neighbors' state have been changed:\n".format(
+                self.delta_ospf)
             if len(self.neighbor_change_list) > 0:
                 for neighbor_dict in self.neighbor_change_list:
 
