@@ -13,6 +13,7 @@
 # python 3.6
 # pip install pyats[library]
 
+
 from genie import testbed
 from genie.ops.utils import get_ops
 from genie.libs.parser.utils import get_parser_exclude
@@ -25,9 +26,16 @@ import concurrent.futures
 import sys
 import re
 from getpass import getpass
+import json
 
 
 class_list = list()
+lost_mac_safe = 0
+lost_arp_safe = 0
+lost_routes_safe = 0
+have_original_dir = False
+dir_original_snapshot = str()
+original_dir = str()
 
 
 def decorator_instance(class_monitor):
@@ -87,12 +95,19 @@ class InterfaceMonitor:
         return intf_up_list
 
     def original(self):
-        self.intf_up_list_original = self.learn_interfaces()
+
+        if not have_original_dir:
+            self.intf_up_list_original = self.learn_interfaces()
+            with open("{}/interface_up_list.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(self.intf_up_list_original, indent=4))
+
+        else:
+            with open("{}/interface_up_list.json".format(dir_original_snapshot), 'r') as f:
+                self.intf_up_list_original = json.load(f)
 
     def current(self):
 
         if hasattr(self, "intf_up_list_original"):
-
             self.intf_up_list_current = self.learn_interfaces()
             self.intf_down_list, self.delta_intf, self.percentage_delta_intf = self.__find_interfaces_down()
             return None
@@ -167,7 +182,18 @@ class VlanMonitor:
             return {}
 
     def original(self):
-        self.vlan_dict_original = self.learn_vlans()
+
+        if not have_original_dir:
+
+            self.vlan_dict_original = self.learn_vlans()
+
+            with open("{}/vlan.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(self.vlan_dict_original, indent=4))
+
+        else:
+
+            with open("{}/vlan.json".format(dir_original_snapshot), 'r') as f:
+                self.vlan_dict_original = json.load(f)
 
     def current(self):
         if hasattr(self, "vlan_dict_original"):
@@ -257,7 +283,20 @@ class FdbMonitor:
             return total_mac_addresses
 
     def original(self):
-        self.total_mac_addresses_original = self.learn_fdb()
+
+        if not have_original_dir:
+
+            self.total_mac_addresses_original = self.learn_fdb()
+            fdb_dict = dict()
+            fdb_dict["total_mac_addresses_original"] = self.total_mac_addresses_original
+            with open("{}/fdb.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(fdb_dict, indent=4))
+
+        else:
+
+            with open("{}/fdb.json".format(dir_original_snapshot), 'r') as f:
+                fdb_dict = json.load(f)
+                self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
 
     def current(self):
         if hasattr(self, "total_mac_addresses_original"):
@@ -346,7 +385,20 @@ class ArpMonitor:
         return arp_entries
 
     def original(self):
-        self.arp_entries_original = self.learn_arp()
+
+        if not have_original_dir:
+
+            self.arp_entries_original = self.learn_arp()
+            arp_dict = dict()
+            arp_dict["total_arp_entries_original"] = self.arp_entries_original
+            with open("{}/arp.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(arp_dict, indent=4))
+
+        else:
+
+            with open("{}/arp.json".format(dir_original_snapshot), 'r') as f:
+                arp_dict = json.load(f)
+                self.arp_entries_original = arp_dict["total_arp_entries_original"]
 
     def current(self):
         if hasattr(self, "arp_entries_original"):
@@ -417,7 +469,20 @@ class RoutingMonitor:
         return num_routes
 
     def original(self):
-        self.num_routes_original = self.learn_routing()
+
+        if not have_original_dir:
+
+            self.num_routes_original = self.learn_routing()
+            routing_dict = dict()
+            routing_dict["num_routes_original"] = self.num_routes_original
+            with open("{}/routing.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(routing_dict, indent=4))
+
+        else:
+
+            with open("{}/routing.json".format(dir_original_snapshot), 'r') as f:
+                routing_dict = json.load(f)
+                self.num_routes_original = routing_dict["num_routes_original"]
 
     def current(self):
         if hasattr(self, "num_routes_original"):
@@ -539,7 +604,15 @@ class OspfMonitor:
         return ospf_neighbor_list
 
     def original(self):
-        self.ospf_neighbor_list_original = self.learn_ospf()
+
+        if not have_original_dir:
+            self.ospf_neighbor_list_original = self.learn_ospf()
+            with open("{}/ospf_neighbors_list.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(self.ospf_neighbor_list_original, indent=4))
+
+        else:
+            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot), 'r') as f:
+                self.ospf_neighbor_list_original = json.load(f)
 
     def current(self):
 
@@ -691,10 +764,25 @@ class AllDetail:
         return output, exclude
 
     def original(self):
-        self.all_detail_original, self.exclude = self.parse_all_cmd()
+
+        if not have_original_dir:
+
+            self.all_detail_original, self.exclude = self.parse_all_cmd()
+            with open("{}/all_detail_original.json".format(original_dir), 'w') as f:
+                f.write(json.dumps(self.all_detail_original, indent=4))
+
+        else:
+            with open("{}/all_detail_original.json".format(dir_original_snapshot), 'r') as f:
+                self.all_detail_original = json.load(f)
 
     def current(self):
         self.all_detail_current, self.exclude = self.parse_all_cmd()
+
+        if have_original_dir:
+            all_detail_current_json = json.dumps(
+                self.all_detail_current, indent=4)
+            self.all_detail_current = json.loads(all_detail_current_json)
+
         self.diff_all_details = self.__find_diff_all_detail()
 
     def __find_diff_all_detail(self):
@@ -772,6 +860,38 @@ def get_testbed() -> tuple:
             print("{} directory does not exist.".format(dir_output))
             dir_output = input(
                 "Enter the directory that will store the output files (e.g. /home/script): ")
+
+        global have_original_dir
+        global dir_original_snapshot
+        try:
+            dir_original_snapshot = cfg.dir_original_snapshot
+            if not os.path.exists("{}".format(dir_original_snapshot)):
+                print("\n{} directory does not exist.".format(dir_output))
+                have_snapshot = input(
+                    "Do you have the original snapshot directory (Y or N): ")
+
+                while have_snapshot.upper() != "Y" and have_snapshot.upper() != "N":
+                    print("Your input is invalid. Please enter Y or N.")
+                    have_snapshot = input(
+                        "Do you have the original snapshot directory (Y or N): ")
+                if exit.upper() == "Y":
+                    dir_original_snapshot = input(
+                        "Enter the directory original snapshot directory (e.g. /home/script): ")
+                    while not os.path.exists("{}".format(dir_original_snapshot)):
+                        print("{} directory does not exist.".format(
+                            dir_original_snapshot))
+                        dir_original_snapshot = input(
+                            "Enter the directory original snapshot directory (e.g. /home/script): ")
+
+                    have_original_dir = True
+                else:
+                    print("The program will learn the original snapshot.\n")
+                    have_original_dir = False
+            else:
+                have_original_dir = True
+        except AttributeError:
+            print("\nThe program did not find the orginal snapshot directory in databaseconfig.py.\nThe program will learn the original snapshot and save it in {}.".format(dir_output))
+            have_original_dir = False
     except:
 
         print(
@@ -845,6 +965,26 @@ def get_testbed() -> tuple:
             }
         }
 
+        have_snapshot = input(
+            "Do you have the original snapshot directory (Y or N): ")
+
+        while have_snapshot.upper() != "Y" and have_snapshot.upper() != "N":
+            print("Your input is invalid. Please enter Y or N.")
+            have_snapshot = input(
+                "Do you have the original snapshot directory (Y or N): ")
+        if exit.upper() == "Y":
+            dir_original_snapshot = input(
+                "Enter the directory original snapshot directory (e.g. /home/script): ")
+            while not os.path.exists("{}".format(dir_original_snapshot)):
+                print("{} directory does not exist.".format(
+                    dir_original_snapshot))
+                dir_original_snapshot = input(
+                    "Enter the directory original snapshot directory (e.g. /home/script): ")
+            have_original_dir = True
+        else:
+            print("The program will learn the original snapshot.\n")
+            have_original_dir = False
+
         dir_output = input(
             "Enter the directory that will store the output files (e.g. /home/script): ")
 
@@ -894,33 +1034,28 @@ def prepend_line(file_name, line):
         os.rename(dummy_file, file_name)
 
 
-lost_mac_safe = 0
-lost_arp_safe = 0
-lost_routes_safe = 0
-
-
 def main():
 
     testbed_dict, lost_safe_tuple, dir_output = get_testbed()
 
-    nxos_3k = Device(testbed_dict)
+    device = Device(testbed_dict)
 
-    global lost_mac_safe, lost_arp_safe, lost_routes_safe
+    global lost_mac_safe, lost_arp_safe, lost_routes_safe, original_dir
     lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
 
     try:
-        if not nxos_3k.device.is_connected():
-            nxos_3k.make_connection()
+        if not device.device.is_connected():
+            device.make_connection()
     except ConnectionError:
         print("\nERROR: Can't establish the connection to the {}.".format(
-            nxos_3k.device.hostname))
+            device.device.hostname))
         print("Please check the hostname, IP aaddress, username, and password.\n")
         sys.exit()
 
-    if nxos_3k.device.is_connected():
-        print("{} is connected.".format(nxos_3k.device.hostname))
+    if device.device.is_connected():
+        print("{} is connected.".format(device.device.hostname))
     else:
-        print("{} is not connected.".format(nxos_3k.device.hostname))
+        print("{} is not connected.".format(device.device.hostname))
 
     if os.path.isfile("{}/all_diff_output.txt".format(dir_output)):
         os.remove("{}/all_diff_output.txt".format(dir_output))
@@ -931,7 +1066,7 @@ def main():
     # print(class_list)
     instance_monitor_dict = dict()
     for class_element in class_list:
-        instance = class_element(nxos_3k.device)
+        instance = class_element(device.device)
         key = "{}_instance".format(type(instance).__name__)
         instance_monitor_dict[key] = instance
         # print(instance)
@@ -944,9 +1079,15 @@ def main():
     try:
         if not have_original:
             print("The program is learning {}'s common information for the original state...".format(
-                nxos_3k.device.hostname))
+                device.device.hostname))
             now1 = datetime.now()
             # runThreadPoolExecutor(instance_monitor_dict, "original")
+            if not have_original_dir:
+                original_dir = "{}/original_snapshot_{}".format(
+                    dir_output, datetime.now().strftime("%Y%m%d-%H%M%S"))
+                if not os.path.exists(original_dir):
+                    os.makedirs(original_dir)
+
             for instance in instance_monitor_dict.values():
                 instance.original()
             now2 = datetime.now()
@@ -958,9 +1099,9 @@ def main():
             )
 
             print("The program is learning {}'s all details for the original state...".format(
-                nxos_3k.device.hostname))
+                device.device.hostname))
             now1 = datetime.now()
-            alldetail_instance = AllDetail(nxos_3k.device)
+            alldetail_instance = AllDetail(device.device)
             alldetail_instance.original()
             now2 = datetime.now()
             print(
@@ -973,23 +1114,23 @@ def main():
 
     except KeyboardInterrupt:
         print("\nThe program has exited before learning's original state.\n".format(
-            nxos_3k.device.hostname))
+            device.device.hostname))
         sys.exit()
 
     except ConnectionError:
         print(
             "\nThe connection to {} has been disconnected before learning original state.\n".format(
-                nxos_3k.device.hostname)
+                device.device.hostname)
         )
         sys.exit()
 
     lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
     print("The programs is beginning to monitor {}...".format(
-        nxos_3k.device.hostname))
+        device.device.hostname))
     while True:
         try:
-            if not nxos_3k.device.is_connected():
-                nxos_3k.make_connection()
+            if not device.device.is_connected():
+                device.make_connection()
 
             # runThreadPoolExecutor(instance_monitor_dict, "current")
             for instance in instance_monitor_dict.values():
@@ -1010,7 +1151,7 @@ def main():
                     string = string + value.diff()
             else:
                 string = string + "{} does not change.\n".format(
-                    nxos_3k.device.hostname)
+                    device.device.hostname)
             string = string + "\n{}".format("-"*102)
 
             print(string)
@@ -1069,7 +1210,7 @@ def main():
                     is_detail = True
                 else:
                     is_detail = False
-
+            device.device.disconnect_all()
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
             print("The program will try to re-connect after 30 seconds.\n")
@@ -1077,19 +1218,19 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        # Uncomment six lines below to import and decorate classes from extra.py
-        # import inspect
-        # import extra
-        # extra_class_list = [m[1] for m in inspect.getmembers(
-        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-        # for extraClass in extra_class_list:
-        #     extraClass = decorator_instance(extraClass)
+    # try:
+    # Uncomment six lines below to import and decorate classes from extra.py
+    # import inspect
+    # import extra
+    # extra_class_list = [m[1] for m in inspect.getmembers(
+    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+    # for extraClass in extra_class_list:
+    #     extraClass = decorator_instance(extraClass)
 
-        main()
-    except SystemExit:
-        sys.exit()
-    except:
-        print("\nSomethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    main()
+    # except SystemExit:
+    #     sys.exit()
+    # except:
+    #     print("\nSomethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
