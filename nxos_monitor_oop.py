@@ -13,19 +13,14 @@
 # python 3.6
 # pip install pyats[library]
 
-from time import sleep
 from genie import testbed
-from genie.libs.ops.interface.nxos.interface import Interface
-from genie.libs.ops.fdb.nxos.fdb import Fdb
-from genie.libs.ops.routing.nxos.routing import Routing
-from genie.libs.ops.vlan.nxos.vlan import Vlan
-from genie.libs.ops.ospf.nxos.ospf import Ospf
-from genie.libs.ops.bgp.nxos.bgp import Bgp
+from genie.ops.utils import get_ops
 from genie.libs.parser.utils import get_parser_exclude
 from genie.utils.diff import Diff
 from unicon.core.errors import ConnectionError
 import os
 from datetime import datetime
+from time import sleep
 import concurrent.futures
 import sys
 import re
@@ -51,17 +46,18 @@ class Device:
 
         if not self.device.is_connected():
             print(
-                "\nThe program is trying to connect to the host {} {} {} device via {} port {}.".format(
+                "\nThe program is trying to connect to the host {} {} {} device via line VTY {} port {}.".format(
                     self.device.name,
-                    self.testbed_dict["devices"][self.device.name]["ip"],
+                    self.testbed_dict["devices"][self.device.name]["connections"]["vty"]["ip"],
                     self.testbed_dict["devices"][self.device.name]["os"].upper(
                     ),
-                    self.testbed_dict["devices"][self.device.name]["protocol"].upper(
+                    self.testbed_dict["devices"][self.device.name]["connections"]["vty"]["protocol"].upper(
                     ),
                     22,
                 )
             )
             self.device.connect(log_stdout=False, prompt_recovery=True)
+            # self.device.connect(via="vty", pool_size=10, log_stdout=False, prompt_recovery=True)
 
 
 @decorator_instance
@@ -76,6 +72,7 @@ class InterfaceMonitor:
         num_intf_up = 0
         intf_up_list = []
 
+        Interface = get_ops('interface', self.device)
         interface_object = Interface(device=self.device)
         interface_object.learn()
 
@@ -150,8 +147,11 @@ class VlanMonitor:
     def learn_vlans(self) -> dict:
 
         if self.device.is_connected():
+
+            Vlan = get_ops('vlan', self.device)
             vlan_object = Vlan(device=self.device)
             vlan_object.learn()
+
             if vlan_object.info.get("vlans", None):
                 vlan_object.info["vlans"].pop("interface_vlan_enabled", None)
                 vlan_object.info["vlans"].pop(
@@ -241,6 +241,7 @@ class FdbMonitor:
 
         total_mac_addresses = 0
 
+        Fdb = get_ops('fdb', self.device)
         fdb_object = Fdb(self.device)
         fdb_object.learn()
 
@@ -401,6 +402,7 @@ class RoutingMonitor:
 
         num_routes = 0
 
+        Routing = get_ops('routing', self.device)
         routing_object = Routing(device=self.device)
         routing_object.learn()
 
@@ -470,6 +472,8 @@ class OspfMonitor:
     def learn_ospf(self) -> list:
 
         ospf_neighbor_list = []
+
+        Ospf = get_ops('ospf', self.device)
         ospf_object = Ospf(device=self.device)
         ospf_object.learn()
         if ospf_object.info["feature_ospf"] == True and ospf_object.info.get("vrf", None):
@@ -626,7 +630,7 @@ class OspfMonitor:
 
     def diff(self):
         if hasattr(self, "neighbor_change_list") and hasattr(self, "delta_ospf") and hasattr(self, "percentage_delta_ospf"):
-            string = "There are {} OSPF neighbors' state have been changed.\nList of the OSPF neighbors' state have been changed:\n".format(
+            string = "\nThere are {} OSPF neighbors' state have been changed.\nList of the OSPF neighbors' state have been changed:\n".format(
                 self.delta_ospf)
             if len(self.neighbor_change_list) > 0:
                 for neighbor_dict in self.neighbor_change_list:
@@ -743,12 +747,20 @@ def get_testbed() -> tuple:
         testbed_dict = {
             "devices": {
                 input_dict["hostname"]: {
-                    "ip": input_dict["ip"],
-                    "protocol": "ssh",
-                    "username": input_dict["username"],
-                    "password": input_dict["password"],
+                    "alias": "uut",
+                    "type": "Nexus",
                     "os": "nxos",
-                },
+                    "connections": {"defaults": {
+                        "class": "unicon.Unicon"},
+                        "vty": {
+                        "protocol": "ssh",
+                        "ip": input_dict["ip"]}},
+                    "credentials": {
+                        "default": {
+                            "password": input_dict["password"],
+                            "username": input_dict["username"]}
+                    }
+                }
             }
         }
 
@@ -816,12 +828,20 @@ def get_testbed() -> tuple:
         testbed_dict = {
             "devices": {
                 hostname: {
-                    "ip": ip,
-                    "protocol": "ssh",
-                    "username": username,
-                    "password": password,
+                    "alias": "uut",
+                    "type": "Nexus",
                     "os": "nxos",
-                },
+                    "connections": {"defaults": {
+                        "class": "unicon.Unicon"},
+                        "vty": {
+                        "protocol": "ssh",
+                        "ip": ip}},
+                    "credentials": {
+                        "default": {
+                            "password": password,
+                            "username": username}
+                    }
+                }
             }
         }
 
@@ -926,7 +946,9 @@ def main():
             print("The program is learning {}'s common information for the original state...".format(
                 nxos_3k.device.hostname))
             now1 = datetime.now()
-            runThreadPoolExecutor(instance_monitor_dict, "original")
+            # runThreadPoolExecutor(instance_monitor_dict, "original")
+            for instance in instance_monitor_dict.values():
+                instance.original()
             now2 = datetime.now()
 
             print(
@@ -969,7 +991,9 @@ def main():
             if not nxos_3k.device.is_connected():
                 nxos_3k.make_connection()
 
-            runThreadPoolExecutor(instance_monitor_dict, "current")
+            # runThreadPoolExecutor(instance_monitor_dict, "current")
+            for instance in instance_monitor_dict.values():
+                instance.current()
 
             string = ""
             string = string + "\n{} {} {}\n".format("-"*40,
