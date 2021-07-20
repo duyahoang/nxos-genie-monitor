@@ -34,8 +34,8 @@ lost_mac_safe = 0
 lost_arp_safe = 0
 lost_routes_safe = 0
 have_original_dir = False
-dir_original_snapshot = str()
-original_dir = str()
+dir_original_snapshot_import = str()
+dir_original_snapshot_create = str()
 
 
 def decorator_instance(class_monitor):
@@ -98,11 +98,11 @@ class InterfaceMonitor:
 
         if not have_original_dir:
             self.intf_up_list_original = self.learn_interfaces()
-            with open("{}/interface_up_list.json".format(original_dir), 'w') as f:
+            with open("{}/interface_up_list.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.intf_up_list_original, indent=4))
 
         else:
-            with open("{}/interface_up_list.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/interface_up_list.json".format(dir_original_snapshot_import), 'r') as f:
                 self.intf_up_list_original = json.load(f)
 
     def current(self):
@@ -187,12 +187,12 @@ class VlanMonitor:
 
             self.vlan_dict_original = self.learn_vlans()
 
-            with open("{}/vlan.json".format(original_dir), 'w') as f:
+            with open("{}/vlan.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.vlan_dict_original, indent=4))
 
         else:
 
-            with open("{}/vlan.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/vlan.json".format(dir_original_snapshot_import), 'r') as f:
                 self.vlan_dict_original = json.load(f)
 
     def current(self):
@@ -289,12 +289,12 @@ class FdbMonitor:
             self.total_mac_addresses_original = self.learn_fdb()
             fdb_dict = dict()
             fdb_dict["total_mac_addresses_original"] = self.total_mac_addresses_original
-            with open("{}/fdb.json".format(original_dir), 'w') as f:
+            with open("{}/fdb.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(fdb_dict, indent=4))
 
         else:
 
-            with open("{}/fdb.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/fdb.json".format(dir_original_snapshot_import), 'r') as f:
                 fdb_dict = json.load(f)
                 self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
 
@@ -391,12 +391,12 @@ class ArpMonitor:
             self.arp_entries_original = self.learn_arp()
             arp_dict = dict()
             arp_dict["total_arp_entries_original"] = self.arp_entries_original
-            with open("{}/arp.json".format(original_dir), 'w') as f:
+            with open("{}/arp.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(arp_dict, indent=4))
 
         else:
 
-            with open("{}/arp.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/arp.json".format(dir_original_snapshot_import), 'r') as f:
                 arp_dict = json.load(f)
                 self.arp_entries_original = arp_dict["total_arp_entries_original"]
 
@@ -475,12 +475,12 @@ class RoutingMonitor:
             self.num_routes_original = self.learn_routing()
             routing_dict = dict()
             routing_dict["num_routes_original"] = self.num_routes_original
-            with open("{}/routing.json".format(original_dir), 'w') as f:
+            with open("{}/routing.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(routing_dict, indent=4))
 
         else:
 
-            with open("{}/routing.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/routing.json".format(dir_original_snapshot_import), 'r') as f:
                 routing_dict = json.load(f)
                 self.num_routes_original = routing_dict["num_routes_original"]
 
@@ -607,11 +607,11 @@ class OspfMonitor:
 
         if not have_original_dir:
             self.ospf_neighbor_list_original = self.learn_ospf()
-            with open("{}/ospf_neighbors_list.json".format(original_dir), 'w') as f:
+            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.ospf_neighbor_list_original, indent=4))
 
         else:
-            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import), 'r') as f:
                 self.ospf_neighbor_list_original = json.load(f)
 
     def current(self):
@@ -768,11 +768,11 @@ class AllDetail:
         if not have_original_dir:
 
             self.all_detail_original, self.exclude = self.parse_all_cmd()
-            with open("{}/all_detail_original.json".format(original_dir), 'w') as f:
+            with open("{}/all_detail_original.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.all_detail_original, indent=4))
 
         else:
-            with open("{}/all_detail_original.json".format(dir_original_snapshot), 'r') as f:
+            with open("{}/all_detail_original.json".format(dir_original_snapshot_import), 'r') as f:
                 self.all_detail_original = json.load(f)
 
     def current(self):
@@ -862,10 +862,10 @@ def get_testbed() -> tuple:
                 "Enter the directory that will store the output files (e.g. /home/script): ")
 
         global have_original_dir
-        global dir_original_snapshot
+        global dir_original_snapshot_import
         try:
-            dir_original_snapshot = cfg.dir_original_snapshot
-            if not os.path.exists("{}".format(dir_original_snapshot)):
+            dir_original_snapshot_import = cfg.dir_original_snapshot
+            if not os.path.exists("{}".format(dir_original_snapshot_import)):
                 print("\n{} directory does not exist.".format(dir_output))
                 have_snapshot = input(
                     "Do you have the original snapshot directory (Y or N): ")
@@ -875,12 +875,12 @@ def get_testbed() -> tuple:
                     have_snapshot = input(
                         "Do you have the original snapshot directory (Y or N): ")
                 if exit.upper() == "Y":
-                    dir_original_snapshot = input(
+                    dir_original_snapshot_import = input(
                         "Enter the directory original snapshot directory (e.g. /home/script): ")
-                    while not os.path.exists("{}".format(dir_original_snapshot)):
+                    while not os.path.exists("{}".format(dir_original_snapshot_import)):
                         print("{} directory does not exist.".format(
-                            dir_original_snapshot))
-                        dir_original_snapshot = input(
+                            dir_original_snapshot_import))
+                        dir_original_snapshot_import = input(
                             "Enter the directory original snapshot directory (e.g. /home/script): ")
 
                     have_original_dir = True
@@ -973,12 +973,12 @@ def get_testbed() -> tuple:
             have_snapshot = input(
                 "Do you have the original snapshot directory (Y or N): ")
         if exit.upper() == "Y":
-            dir_original_snapshot = input(
+            dir_original_snapshot_import = input(
                 "Enter the directory original snapshot directory (e.g. /home/script): ")
-            while not os.path.exists("{}".format(dir_original_snapshot)):
+            while not os.path.exists("{}".format(dir_original_snapshot_import)):
                 print("{} directory does not exist.".format(
-                    dir_original_snapshot))
-                dir_original_snapshot = input(
+                    dir_original_snapshot_import))
+                dir_original_snapshot_import = input(
                     "Enter the directory original snapshot directory (e.g. /home/script): ")
             have_original_dir = True
         else:
@@ -1040,7 +1040,7 @@ def main():
 
     device = Device(testbed_dict)
 
-    global lost_mac_safe, lost_arp_safe, lost_routes_safe, original_dir
+    global lost_mac_safe, lost_arp_safe, lost_routes_safe, dir_original_snapshot_create
     lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
 
     try:
@@ -1083,10 +1083,10 @@ def main():
             now1 = datetime.now()
             # runThreadPoolExecutor(instance_monitor_dict, "original")
             if not have_original_dir:
-                original_dir = "{}/original_snapshot_{}".format(
+                dir_original_snapshot_create = "{}/original_snapshot_{}".format(
                     dir_output, datetime.now().strftime("%Y%m%d-%H%M%S"))
-                if not os.path.exists(original_dir):
-                    os.makedirs(original_dir)
+                if not os.path.exists(dir_original_snapshot_create):
+                    os.makedirs(dir_original_snapshot_create)
 
             for instance in instance_monitor_dict.values():
                 instance.original()
