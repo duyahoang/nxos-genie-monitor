@@ -30,6 +30,7 @@ import json
 
 
 class_list = list()
+unsupport_list = list()
 lost_mac_safe = 0
 lost_arp_safe = 0
 lost_routes_safe = 0
@@ -79,20 +80,29 @@ class InterfaceMonitor:
 
         num_intf_up = 0
         intf_up_list = []
+        try:
+            Interface = get_ops('interface', self.device)
+            interface_object = Interface(device=self.device)
+            interface_object.learn()
 
-        Interface = get_ops('interface', self.device)
-        interface_object = Interface(device=self.device)
-        interface_object.learn()
+            for intf in interface_object.info:
+                if (
+                    interface_object.info[intf].get("oper_status", None)
+                    and interface_object.info[intf]["oper_status"] == "up"
+                ):
+                    intf_up_list.append(intf)
+                    num_intf_up = num_intf_up + 1
 
-        for intf in interface_object.info:
-            if (
-                interface_object.info[intf].get("oper_status", None)
-                and interface_object.info[intf]["oper_status"] == "up"
-            ):
-                intf_up_list.append(intf)
-                num_intf_up = num_intf_up + 1
+            return intf_up_list
 
-        return intf_up_list
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            unsupport_list.append("InterfaceMonitor_instance")
+            print("Cannot monitor interfaces.")
+            return intf_up_list
 
     def original(self):
 
@@ -161,8 +171,7 @@ class VlanMonitor:
 
     def learn_vlans(self) -> dict:
 
-        if self.device.is_connected():
-
+        try:
             Vlan = get_ops('vlan', self.device)
             vlan_object = Vlan(device=self.device)
             vlan_object.learn()
@@ -178,7 +187,13 @@ class VlanMonitor:
                 return vlan_dict
             else:
                 return {}
-        else:
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            unsupport_list.append("VlanMonitor_instance")
+            print("Cannot monitor VLANs.")
             return {}
 
     def original(self):
@@ -266,20 +281,28 @@ class FdbMonitor:
     def learn_fdb(self) -> int:
 
         total_mac_addresses = 0
-
-        Fdb = get_ops('fdb', self.device)
-        fdb_object = Fdb(self.device)
-        fdb_object.learn()
-
         try:
-            for key in fdb_object.info["mac_table"]["vlans"]:
-                total_mac_addresses = total_mac_addresses + len(
-                    fdb_object.info["mac_table"]["vlans"][key]["mac_addresses"]
-                )
+            Fdb = get_ops('fdb', self.device)
+            fdb_object = Fdb(self.device)
+            fdb_object.learn()
 
-            return total_mac_addresses
+            try:
+                for key in fdb_object.info["mac_table"]["vlans"]:
+                    total_mac_addresses = total_mac_addresses + len(
+                        fdb_object.info["mac_table"]["vlans"][key]["mac_addresses"]
+                    )
 
+                return total_mac_addresses
+
+            except:
+                return total_mac_addresses
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
         except:
+            unsupport_list.append("FdbMonitor_instance")
+            print("Cannot monitor MAC address table.")
             return total_mac_addresses
 
     def original(self):
@@ -374,13 +397,16 @@ class ArpMonitor:
 
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
-
+            raise ConnectionError
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except:
             print(
-                "\nCannot parse the command: {}\nThe device may not support this command.\n".format(
+                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor ARP table.\n".format(
                     cmd
                 )
             )
+            unsupport_list.append("ArpMonitor_instance")
 
         return arp_entries
 
@@ -453,19 +479,25 @@ class RoutingMonitor:
     def learn_routing(self) -> int:
 
         num_routes = 0
+        try:
+            Routing = get_ops('routing', self.device)
+            routing_object = Routing(device=self.device)
+            routing_object.learn()
 
-        Routing = get_ops('routing', self.device)
-        routing_object = Routing(device=self.device)
-        routing_object.learn()
-
-        for vrf_key in routing_object.info["vrf"]:
-            for ip_protocol_key in routing_object.info["vrf"][vrf_key]["address_family"]:
-                num_routes = num_routes + len(
-                    routing_object.info["vrf"][vrf_key]["address_family"][ip_protocol_key][
-                        "routes"
-                    ]
-                )
-
+            for vrf_key in routing_object.info["vrf"]:
+                for ip_protocol_key in routing_object.info["vrf"][vrf_key]["address_family"]:
+                    num_routes = num_routes + len(
+                        routing_object.info["vrf"][vrf_key]["address_family"][ip_protocol_key][
+                            "routes"
+                        ]
+                    )
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            unsupport_list.append("RoutingMonitor_instance")
+            print("Cannot monitor routing table.")
         return num_routes
 
     def original(self):
@@ -537,70 +569,76 @@ class OspfMonitor:
     def learn_ospf(self) -> list:
 
         ospf_neighbor_list = []
+        try:
+            Ospf = get_ops('ospf', self.device)
+            ospf_object = Ospf(device=self.device)
+            ospf_object.learn()
+            if ospf_object.info["feature_ospf"] == True and ospf_object.info.get("vrf", None):
+                for vrf in list(ospf_object.info["vrf"].keys()):
+                    for instance in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"].keys()):
+                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance].get("areas", None):
 
-        Ospf = get_ops('ospf', self.device)
-        ospf_object = Ospf(device=self.device)
-        ospf_object.learn()
-        if ospf_object.info["feature_ospf"] == True and ospf_object.info.get("vrf", None):
-            for vrf in list(ospf_object.info["vrf"].keys()):
-                for instance in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"].keys()):
-                    if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance].get("areas", None):
+                            for area in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"].keys()):
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("virtual_links", None):
+                                    for vLink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"].keys()):
+                                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink].get("neighbors", None):
+                                            for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"].keys()):
 
-                        for area in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"].keys()):
-                            if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("virtual_links", None):
-                                for vLink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"].keys()):
-                                    if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink].get("neighbors", None):
-                                        for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"].keys()):
+                                                neighbor_dict = {
+                                                    "vrf": vrf,
+                                                    "ospf_instance": instance,
+                                                    "area": area,
+                                                    "virtual_link": vLink,
+                                                    "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["neighbor_router_id"],
+                                                    "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["address"],
+                                                    "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["state"]
+                                                }
 
-                                            neighbor_dict = {
-                                                "vrf": vrf,
-                                                "ospf_instance": instance,
-                                                "area": area,
-                                                "virtual_link": vLink,
-                                                "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["neighbor_router_id"],
-                                                "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["address"],
-                                                "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["virtual_links"][vLink]["neighbors"][neighbor]["state"]
-                                            }
+                                                ospf_neighbor_list.append(
+                                                    neighbor_dict)
 
-                                            ospf_neighbor_list.append(
-                                                neighbor_dict)
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("sham_links", None):
+                                    for slink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"].keys()):
+                                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink].get("neighbors", None):
+                                            for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"].keys()):
 
-                            if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("sham_links", None):
-                                for slink in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"].keys()):
-                                    if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink].get("neighbors", None):
-                                        for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"].keys()):
+                                                neighbor_dict = {
+                                                    "vrf": vrf,
+                                                    "ospf_instance": instance,
+                                                    "area": area,
+                                                    "sham_link": slink,
+                                                    "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["neighbor_router_id"],
+                                                    "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["address"],
+                                                    "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["state"]
+                                                }
 
-                                            neighbor_dict = {
-                                                "vrf": vrf,
-                                                "ospf_instance": instance,
-                                                "area": area,
-                                                "sham_link": slink,
-                                                "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["neighbor_router_id"],
-                                                "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["address"],
-                                                "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["sham_links"][slink]["neighbors"][neighbor]["state"]
-                                            }
+                                                ospf_neighbor_list.append(
+                                                    neighbor_dict)
 
-                                            ospf_neighbor_list.append(
-                                                neighbor_dict)
+                                if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("interfaces", None):
+                                    for interface in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"].keys()):
+                                        if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface].get("neighbors", None):
+                                            for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"].keys()):
 
-                            if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area].get("interfaces", None):
-                                for interface in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"].keys()):
-                                    if ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface].get("neighbors", None):
-                                        for neighbor in list(ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"].keys()):
+                                                neighbor_dict = {
+                                                    "vrf": vrf,
+                                                    "ospf_instance": instance,
+                                                    "area": area,
+                                                    "interface": interface,
+                                                    "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["neighbor_router_id"],
+                                                    "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["address"],
+                                                    "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["state"]
+                                                }
 
-                                            neighbor_dict = {
-                                                "vrf": vrf,
-                                                "ospf_instance": instance,
-                                                "area": area,
-                                                "interface": interface,
-                                                "neighbor_router_id": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["neighbor_router_id"],
-                                                "neighbor_interface_address": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["address"],
-                                                "state": ospf_object.info["vrf"][vrf]["address_family"]["ipv4"]["instance"][instance]["areas"][area]["interfaces"][interface]["neighbors"][neighbor]["state"]
-                                            }
-
-                                            ospf_neighbor_list.append(
-                                                neighbor_dict)
-
+                                                ospf_neighbor_list.append(
+                                                    neighbor_dict)
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            unsupport_list.append("OspfMonitor_instance")
+            print("Cannot monitor OSPF neighbors")
         return ospf_neighbor_list
 
     def original(self):
@@ -1098,6 +1136,10 @@ def main():
                 )
             )
 
+            # print(unsupport_list)
+            for unsupport in unsupport_list:
+                instance_monitor_dict.pop(unsupport, None)
+
             print("The program is learning {}'s all details for the original state...".format(
                 device.device.hostname))
             now1 = datetime.now()
@@ -1136,6 +1178,15 @@ def main():
             for instance in instance_monitor_dict.values():
                 instance.current()
 
+            # print(unsupport_list)
+            for unsupport in unsupport_list:
+                instance_monitor_dict.pop(unsupport, None)
+
+            if not instance_monitor_dict:
+                print("\nThe {} device does not support any monitoring category in this tool.\n".format(
+                    device.device.hostname))
+                sys.exit()
+
             string = ""
             string = string + "\n{} {} {}\n".format("-"*40,
                                                     datetime.now().strftime("%Y-%b-%d %X"), "-"*40)
@@ -1159,7 +1210,7 @@ def main():
                 "{}/common_diff_output.txt".format(dir_output), string)
 
             if is_detail:
-                print("\nThe porgram is parsing all commands...")
+                print("\nThe program is parsing all commands...")
                 alldetail_instance.current()
                 string = alldetail_instance.diff()
                 print(
@@ -1211,6 +1262,7 @@ def main():
                 else:
                     is_detail = False
             device.device.disconnect_all()
+
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
             print("The program will try to re-connect after 30 seconds.\n")
@@ -1219,6 +1271,7 @@ def main():
 
 if __name__ == '__main__':
     try:
+
         # Uncomment six lines below to import and decorate classes from extra.py
         # import inspect
         # import extra
