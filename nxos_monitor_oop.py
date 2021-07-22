@@ -16,6 +16,7 @@
 
 from genie import testbed
 from genie.ops.utils import get_ops
+from genie import parsergen
 from genie.libs.parser.utils import get_parser_exclude
 from genie.utils.diff import Diff
 from unicon.core.errors import ConnectionError
@@ -27,6 +28,7 @@ import sys
 import re
 from getpass import getpass
 import json
+from pprint import pprint
 
 
 class_list = list()
@@ -112,8 +114,14 @@ class InterfaceMonitor:
                 f.write(json.dumps(self.intf_up_list_original, indent=4))
 
         else:
-            with open("{}/interface_up_list.json".format(dir_original_snapshot_import), 'r') as f:
-                self.intf_up_list_original = json.load(f)
+            try:
+                if os.path.isfile("{}/interface_up_list.json".format(dir_original_snapshot_import)):
+                    with open("{}/interface_up_list.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.intf_up_list_original = json.load(f)
+                else:
+                    unsupport_list.append("InterfaceMonitor_instance")
+            except:
+                unsupport_list.append("InterfaceMonitor_instance")
 
     def current(self):
 
@@ -154,6 +162,120 @@ class InterfaceMonitor:
             if len(self.intf_down_list) > 0:
                 for intf in self.intf_down_list:
                     string = string + "   {}\n".format(intf)
+                return string
+            else:
+                string = string + "   None\n"
+                return string
+        else:
+            return None
+
+
+@decorator_instance
+class FabricpathMonitor:
+    # __init__ need to have two arguments. The device will be passed when create an instance.
+    def __init__(self, device) -> None:
+        self.device = device
+
+    def learn_fabricpath(self):
+
+        fabricpath_adjacency_dict = dict()
+
+        try:
+            cmd = "show fabricpath isis adjacency"
+            output = self.device.parse(cmd)
+
+            if len(output) < 1:
+                return fabricpath_adjacency_dict
+            if len(output["domain"]) < 1:
+                return fabricpath_adjacency_dict
+
+            # regex = r"^([0-9a-f]{4}[.]){2}([0-9a-f]{4})$"
+            for key in output["domain"]:
+                if "interfaces" in output["domain"][key].keys():
+                    for inside_key in output["domain"][key]["interfaces"]:
+                        if output["domain"][key]["interfaces"][inside_key]["state"].lower() == "up":
+                            fabricpath_adjacency_dict[inside_key] = output["domain"][key]["interfaces"][inside_key]
+
+            return fabricpath_adjacency_dict
+
+        except ConnectionError:
+            print("\nThe connection is disconnected. The device may be reloading.")
+            raise ConnectionError
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except:
+            print(
+                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath.\n".format(
+                    cmd
+                )
+            )
+            unsupport_list.append("FabricpathMonitor_instance")
+
+        return fabricpath_adjacency_dict
+
+    def original(self) -> None:
+
+        if not have_original_dir:
+            self.fabricpath_adjacency_dict_original = self.learn_fabricpath()
+            with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_create), 'w') as f:
+                f.write(json.dumps(
+                    self.fabricpath_adjacency_dict_original, indent=4))
+
+        else:
+            try:
+                if os.path.isfile("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_import)):
+
+                    with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.fabricpath_adjacency_dict_original = json.load(f)
+                else:
+                    unsupport_list.append("FabricpathMonitor_instance")
+            except:
+                unsupport_list.append("FabricpathMonitor_instance")
+
+    def current(self) -> None:
+
+        if hasattr(self, "fabricpath_adjacency_dict_original"):
+            self.fabricpath_adjacency_dict_current = self.learn_fabricpath()
+            self.fabricpath_down_list, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__fabricpath_down_list()
+            return None
+        else:
+            print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
+                self.device.hostname))
+            return None
+
+    def __find_fabricpath_down(self):
+        fabricpath_down_list = []
+        for key, value in self.fabricpath_adjacency_dict_original:
+            if key not in self.fabricpath_adjacency_dict_current.keys():
+                fabricpath_down_list.append({key: value})
+
+        delta_fabricpath = len(fabricpath_down_list)
+        percentage_delta_fabricpath = (len(fabricpath_down_list) /
+                                       len(self.fabricpath_adjacency_dict_original)) * 100
+
+        return (fabricpath_down_list, delta_fabricpath, percentage_delta_fabricpath)
+
+    def is_changed(self) -> bool:
+
+        if hasattr(self, "fabricpath_down_list"):
+            if len(self.fabricpath_down_list) > 0:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def diff(self) -> str:
+
+        if hasattr(self, "fabricpath_down_list") and hasattr(self, "delta_fabricpath") and hasattr(self, "percentage_delta_fabricpath"):
+            string = "There are {} ({}%) fabricpath changed to down.\nList of the fabricpath changed to down:\n".format(
+                self.delta_fabricpath, self.percentage_delta_fabricpath)
+            if len(self.fabricpath_down_list) > 0:
+                for data in self.fabricpath_down_list:
+                    string = string + "\n   {}\n".format(data.keys()[0])
+                    for value in data.values():
+                        string = string + "      {}\n".format(value)
+
                 return string
             else:
                 string = string + "   None\n"
@@ -206,9 +328,14 @@ class VlanMonitor:
                 f.write(json.dumps(self.vlan_dict_original, indent=4))
 
         else:
-
-            with open("{}/vlan.json".format(dir_original_snapshot_import), 'r') as f:
-                self.vlan_dict_original = json.load(f)
+            try:
+                if os.path.isfile("{}/vlan.json".format(dir_original_snapshot_import)):
+                    with open("{}/vlan.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.vlan_dict_original = json.load(f)
+                else:
+                    unsupport_list.append("VlanMonitor_instance")
+            except:
+                unsupport_list.append("VlanMonitor_instance")
 
     def current(self):
         if hasattr(self, "vlan_dict_original"):
@@ -316,10 +443,15 @@ class FdbMonitor:
                 f.write(json.dumps(fdb_dict, indent=4))
 
         else:
-
-            with open("{}/fdb.json".format(dir_original_snapshot_import), 'r') as f:
-                fdb_dict = json.load(f)
-                self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
+            try:
+                if os.path.isfile("{}/fdb.json".format(dir_original_snapshot_import)):
+                    with open("{}/fdb.json".format(dir_original_snapshot_import), 'r') as f:
+                        fdb_dict = json.load(f)
+                        self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
+                else:
+                    unsupport_list.append("FdbMonitor_instance")
+            except:
+                unsupport_list.append("FdbMonitor_instance")
 
     def current(self):
         if hasattr(self, "total_mac_addresses_original"):
@@ -421,10 +553,15 @@ class ArpMonitor:
                 f.write(json.dumps(arp_dict, indent=4))
 
         else:
-
-            with open("{}/arp.json".format(dir_original_snapshot_import), 'r') as f:
-                arp_dict = json.load(f)
-                self.arp_entries_original = arp_dict["total_arp_entries_original"]
+            try:
+                if os.path.isfile("{}/arp.json".format(dir_original_snapshot_import)):
+                    with open("{}/arp.json".format(dir_original_snapshot_import), 'r') as f:
+                        arp_dict = json.load(f)
+                        self.arp_entries_original = arp_dict["total_arp_entries_original"]
+                else:
+                    unsupport_list.append("ArpMonitor_instance")
+            except:
+                unsupport_list.append("ArpMonitor_instance")
 
     def current(self):
         if hasattr(self, "arp_entries_original"):
@@ -511,10 +648,15 @@ class RoutingMonitor:
                 f.write(json.dumps(routing_dict, indent=4))
 
         else:
-
-            with open("{}/routing.json".format(dir_original_snapshot_import), 'r') as f:
-                routing_dict = json.load(f)
-                self.num_routes_original = routing_dict["num_routes_original"]
+            try:
+                if os.path.isfile("{}/routing.json".format(dir_original_snapshot_import)):
+                    with open("{}/routing.json".format(dir_original_snapshot_import), 'r') as f:
+                        routing_dict = json.load(f)
+                        self.num_routes_original = routing_dict["num_routes_original"]
+                else:
+                    unsupport_list.append("RoutingMonitor_instance")
+            except:
+                unsupport_list.append("RoutingMonitor_instance")
 
     def current(self):
         if hasattr(self, "num_routes_original"):
@@ -649,8 +791,14 @@ class OspfMonitor:
                 f.write(json.dumps(self.ospf_neighbor_list_original, indent=4))
 
         else:
-            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import), 'r') as f:
-                self.ospf_neighbor_list_original = json.load(f)
+            try:
+                if os.path.isfile("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import)):
+                    with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.ospf_neighbor_list_original = json.load(f)
+                else:
+                    unsupport_list.append("OspfMonitor_instance")
+            except:
+                unsupport_list.append("OspfMonitor_instance")
 
     def current(self):
 
@@ -810,8 +958,14 @@ class AllDetail:
                 f.write(json.dumps(self.all_detail_original, indent=4))
 
         else:
-            with open("{}/all_detail_original.json".format(dir_original_snapshot_import), 'r') as f:
-                self.all_detail_original = json.load(f)
+            try:
+                if os.path.isfile("{}/interface_up_list.json".format(dir_original_snapshot_import)):
+                    with open("{}/all_detail_original.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.all_detail_original = json.load(f)
+                else:
+                    self.all_detail_original, self.exclude = self.parse_all_cmd()
+            except:
+                self.all_detail_original, self.exclude = self.parse_all_cmd()
 
     def current(self):
         self.all_detail_current, self.exclude = self.parse_all_cmd()
@@ -1120,11 +1274,14 @@ def main():
                 device.device.hostname))
             now1 = datetime.now()
             # runThreadPoolExecutor(instance_monitor_dict, "original")
+
             if not have_original_dir:
-                dir_original_snapshot_create = "{}/original_snapshot_{}".format(
-                    dir_output, datetime.now().strftime("%Y%m%d-%H%M%S"))
-                if not os.path.exists(dir_original_snapshot_create):
-                    os.makedirs(dir_original_snapshot_create)
+                while True:
+                    dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(device.device.hostname,
+                                                                                       dir_output, datetime.now().strftime("%Y%m%d-%H%M%S"))
+                    if not os.path.exists(dir_original_snapshot_create):
+                        os.makedirs(dir_original_snapshot_create)
+                        break
 
             for instance in instance_monitor_dict.values():
                 instance.original()
