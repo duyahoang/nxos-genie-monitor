@@ -172,7 +172,7 @@ class InterfaceMonitor:
 
 @decorator_instance
 class FabricpathMonitor:
-    # __init__ need to have two arguments. The device will be passed when create an instance.
+
     def __init__(self, device) -> None:
         self.device = device
 
@@ -189,7 +189,6 @@ class FabricpathMonitor:
             if len(output["domain"]) < 1:
                 return fabricpath_adjacency_dict
 
-            # regex = r"^([0-9a-f]{4}[.]){2}([0-9a-f]{4})$"
             for key in output["domain"]:
                 if "interfaces" in output["domain"][key].keys():
                     for inside_key in output["domain"][key]["interfaces"]:
@@ -232,11 +231,14 @@ class FabricpathMonitor:
             except:
                 unsupport_list.append("FabricpathMonitor_instance")
 
+        if len(self.fabricpath_adjacency_dict_original) == 0:
+            unsupport_list.append("FabricpathMonitor_instance")
+
     def current(self) -> None:
 
         if hasattr(self, "fabricpath_adjacency_dict_original"):
             self.fabricpath_adjacency_dict_current = self.learn_fabricpath()
-            self.fabricpath_down_list, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__fabricpath_down_list()
+            self.fabricpath_down_list, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
             return None
         else:
             print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
@@ -1277,8 +1279,8 @@ def main():
 
             if not have_original_dir:
                 while True:
-                    dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(device.device.hostname,
-                                                                                       dir_output, datetime.now().strftime("%Y%m%d-%H%M%S"))
+                    dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(
+                        dir_output, device.device.hostname, datetime.now().strftime("%Y%m%d-%H%M%S"))
                     if not os.path.exists(dir_original_snapshot_create):
                         os.makedirs(dir_original_snapshot_create)
                         break
