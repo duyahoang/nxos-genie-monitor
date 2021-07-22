@@ -120,8 +120,14 @@ class InterfaceMonitor:
                         self.intf_up_list_original = json.load(f)
                 else:
                     unsupport_list.append("InterfaceMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("InterfaceMonitor_instance")
+                return None
+
+        if len(self.intf_up_list_original) == 0:
+            unsupport_list.append("InterfaceMonitor_instance")
+            return None
 
     def current(self):
 
@@ -228,11 +234,14 @@ class FabricpathMonitor:
                         self.fabricpath_adjacency_dict_original = json.load(f)
                 else:
                     unsupport_list.append("FabricpathMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("FabricpathMonitor_instance")
+                return None
 
         if len(self.fabricpath_adjacency_dict_original) == 0:
             unsupport_list.append("FabricpathMonitor_instance")
+            return None
 
     def current(self) -> None:
 
@@ -336,8 +345,14 @@ class VlanMonitor:
                         self.vlan_dict_original = json.load(f)
                 else:
                     unsupport_list.append("VlanMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("VlanMonitor_instance")
+                return None
+
+        if len(self.vlan_dict_original) == 0:
+            unsupport_list.append("VlanMonitor_instance")
+            return None
 
     def current(self):
         if hasattr(self, "vlan_dict_original"):
@@ -452,8 +467,14 @@ class FdbMonitor:
                         self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
                 else:
                     unsupport_list.append("FdbMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("FdbMonitor_instance")
+                return None
+
+        if self.total_mac_addresses_original == 0:
+            unsupport_list.append("FdbMonitor_instance")
+            return None
 
     def current(self):
         if hasattr(self, "total_mac_addresses_original"):
@@ -562,8 +583,14 @@ class ArpMonitor:
                         self.arp_entries_original = arp_dict["total_arp_entries_original"]
                 else:
                     unsupport_list.append("ArpMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("ArpMonitor_instance")
+                return None
+
+        if self.arp_entries_original == 0:
+            unsupport_list.append("ArpMonitor_instance")
+            return None
 
     def current(self):
         if hasattr(self, "arp_entries_original"):
@@ -657,8 +684,14 @@ class RoutingMonitor:
                         self.num_routes_original = routing_dict["num_routes_original"]
                 else:
                     unsupport_list.append("RoutingMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("RoutingMonitor_instance")
+                return None
+
+        if self.num_routes_original == 0:
+            unsupport_list.append("RoutingMonitor_instance")
+            return None
 
     def current(self):
         if hasattr(self, "num_routes_original"):
@@ -799,8 +832,14 @@ class OspfMonitor:
                         self.ospf_neighbor_list_original = json.load(f)
                 else:
                     unsupport_list.append("OspfMonitor_instance")
+                    return None
             except:
                 unsupport_list.append("OspfMonitor_instance")
+                return None
+
+        if len(self.ospf_neighbor_list_original) == 0:
+            unsupport_list.append("OspfMonitor_instance")
+            return None
 
     def current(self):
 
