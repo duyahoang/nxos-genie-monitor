@@ -177,7 +177,7 @@ class InterfaceMonitor:
 
 
 @decorator_instance
-class FabricpathMonitor:
+class FabricpathAdjacencyMonitor:
 
     def __init__(self, device) -> None:
         self.device = device
@@ -198,8 +198,7 @@ class FabricpathMonitor:
             for key in output["domain"]:
                 if "interfaces" in output["domain"][key].keys():
                     for inside_key in output["domain"][key]["interfaces"]:
-                        if output["domain"][key]["interfaces"][inside_key]["state"].lower() == "up":
-                            fabricpath_adjacency_dict[inside_key] = output["domain"][key]["interfaces"][inside_key]
+                        fabricpath_adjacency_dict[inside_key] = output["domain"][key]["interfaces"][inside_key]
 
             return fabricpath_adjacency_dict
 
@@ -214,7 +213,7 @@ class FabricpathMonitor:
                     cmd
                 )
             )
-            unsupport_list.append("FabricpathMonitor_instance")
+            unsupport_list.append("FabricpathAdjacencyMonitor_instance")
 
         return fabricpath_adjacency_dict
 
@@ -233,21 +232,22 @@ class FabricpathMonitor:
                     with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_import), 'r') as f:
                         self.fabricpath_adjacency_dict_original = json.load(f)
                 else:
-                    unsupport_list.append("FabricpathMonitor_instance")
+                    unsupport_list.append(
+                        "FabricpathAdjacencyMonitor_instance")
                     return None
             except:
-                unsupport_list.append("FabricpathMonitor_instance")
+                unsupport_list.append("FabricpathAdjacencyMonitor_instance")
                 return None
 
         if len(self.fabricpath_adjacency_dict_original) == 0:
-            unsupport_list.append("FabricpathMonitor_instance")
+            unsupport_list.append("FabricpathAdjacencyMonitor_instance")
             return None
 
     def current(self) -> None:
 
         if hasattr(self, "fabricpath_adjacency_dict_original"):
             self.fabricpath_adjacency_dict_current = self.learn_fabricpath()
-            self.fabricpath_down_list, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
+            self.fabricpath_down_dict, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
             return None
         else:
             print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
@@ -255,21 +255,29 @@ class FabricpathMonitor:
             return None
 
     def __find_fabricpath_down(self):
-        fabricpath_down_list = []
-        for key, value in self.fabricpath_adjacency_dict_original:
-            if key not in self.fabricpath_adjacency_dict_current.keys():
-                fabricpath_down_list.append({key: value})
+        fabricpath_down_dict = {}
+        for key, value in self.fabricpath_adjacency_dict_original.items():
 
-        delta_fabricpath = len(fabricpath_down_list)
-        percentage_delta_fabricpath = (len(fabricpath_down_list) /
+            if value["state"].lower() != "up":
+                continue
+            else:
+                if key not in self.fabricpath_adjacency_dict_current:
+                    fabricpath_down_dict[key] = value.copy()
+                    fabricpath_down_dict[key]["state"] = "Not found in Fabricpath IS-IS adjacency database"
+                else:
+                    if self.fabricpath_adjacency_dict_current[key]["state"].lower() != "up":
+                        fabricpath_down_dict[key] = self.fabricpath_adjacency_dict_current[key]
+
+        delta_fabricpath = len(fabricpath_down_dict)
+        percentage_delta_fabricpath = (len(fabricpath_down_dict) /
                                        len(self.fabricpath_adjacency_dict_original)) * 100
 
-        return (fabricpath_down_list, delta_fabricpath, percentage_delta_fabricpath)
+        return (fabricpath_down_dict, delta_fabricpath, percentage_delta_fabricpath)
 
     def is_changed(self) -> bool:
 
-        if hasattr(self, "fabricpath_down_list"):
-            if len(self.fabricpath_down_list) > 0:
+        if hasattr(self, "fabricpath_down_dict"):
+            if len(self.fabricpath_down_dict) > 0:
                 return True
             else:
                 return False
@@ -278,15 +286,16 @@ class FabricpathMonitor:
 
     def diff(self) -> str:
 
-        if hasattr(self, "fabricpath_down_list") and hasattr(self, "delta_fabricpath") and hasattr(self, "percentage_delta_fabricpath"):
+        if hasattr(self, "fabricpath_down_dict") and hasattr(self, "delta_fabricpath") and hasattr(self, "percentage_delta_fabricpath"):
             string = "There are {} ({}%) fabricpath changed to down.\nList of the fabricpath changed to down:\n".format(
                 self.delta_fabricpath, self.percentage_delta_fabricpath)
-            if len(self.fabricpath_down_list) > 0:
-                for data in self.fabricpath_down_list:
-                    string = string + "\n   {}\n".format(data.keys()[0])
-                    for value in data.values():
-                        string = string + "      {}\n".format(value)
-
+            if len(self.fabricpath_down_dict) > 0:
+                for key, value in self.fabricpath_down_dict.items():
+                    string = string + "   {}\n".format(key)
+                    for inside_key, inside_value in value.items():
+                        string = string + \
+                            "      {}: {}\n".format(inside_key, inside_value)
+                    string = string + "\n"
                 return string
             else:
                 string = string + "   None\n"
@@ -1468,20 +1477,20 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
+    # try:
 
-        # Uncomment six lines below to import and decorate classes from extra.py
-        # import inspect
-        # import extra
-        # extra_class_list = [m[1] for m in inspect.getmembers(
-        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-        # for extraClass in extra_class_list:
-        #     extraClass = decorator_instance(extraClass)
+    # Uncomment six lines below to import and decorate classes from extra.py
+    # import inspect
+    # import extra
+    # extra_class_list = [m[1] for m in inspect.getmembers(
+    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+    # for extraClass in extra_class_list:
+    #     extraClass = decorator_instance(extraClass)
 
-        main()
-    except SystemExit:
-        sys.exit()
-    except:
-        print("\nSomethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    main()
+    # except SystemExit:
+    sys.exit()
+    # except:
+    #     print("\nSomethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
