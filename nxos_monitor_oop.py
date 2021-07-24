@@ -1178,7 +1178,7 @@ class AllDetail:
             string = string + "\n{}".format("-"*102)
             return string
         else:
-            return None
+            return ""
 
 
 def get_testbed() -> tuple:
