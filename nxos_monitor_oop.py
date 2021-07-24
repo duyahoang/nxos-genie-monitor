@@ -173,16 +173,140 @@ class InterfaceMonitor:
                 string = string + "   None\n"
                 return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
+class FabricpathSwitchidMonitor:
+    # __init__ need to have two arguments. The device will be passed when create an instance.
+    def __init__(self, device) -> None:
+        self.device = device
+
+    def learn_fabricpath_switchid(self):
+
+        fabricpath_switchid_dict = {}
+        try:
+            cmd = "show fabricpath switch-id | json"
+            output = self.device.execute(cmd)
+
+            output_dict = json.loads(output)
+            fabricpath_switchid_dict["data"] = {}
+            for element in output_dict["TABLE_swid"]["ROW_swid"]:
+                fabricpath_switchid_dict["data"][element["swid-value"]
+                                                 ] = element.copy()
+
+            fabricpath_switchid_dict["local_swid_present"] = output_dict["local_swid_present"]
+            fabricpath_switchid_dict["number_switch-ids"] = output_dict["no_switch-ids"]
+
+        except ConnectionError:
+            print("\nThe connection is disconnected. The device may be reloading.")
+            raise ConnectionError
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except:
+            print(
+                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath switch-id.\n".format(
+                    cmd
+                )
+            )
+            unsupport_list.append("FabricpathSwitchidMonitor_instance")
+
+        return fabricpath_switchid_dict
+
+    def original(self) -> None:
+        # This function should assign original state to local object variable and return None.
+        if not have_original_dir:
+            self.fabricpath_switchid_dict_original = self.learn_fabricpath_switchid()
+            with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_create), 'w') as f:
+                f.write(json.dumps(
+                    self.fabricpath_switchid_dict_original, indent=4))
+
+        else:
+            try:
+                if os.path.isfile("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import)):
+
+                    with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.fabricpath_switchid_dict_original = json.load(f)
+                else:
+                    unsupport_list.append(
+                        "FabricpathSwitchidMonitor_instance")
+                    return None
+            except:
+                unsupport_list.append("FabricpathSwitchidMonitor_instance")
+                return None
+
+        if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["data"]) == 0:
+            unsupport_list.append("FabricpathSwitchidMonitor_instance")
+            return None
+
+    def current(self) -> None:
+        if hasattr(self, "fabricpath_switchid_dict_original"):
+            self.fabricpath_switchid_dict_current = self.learn_fabricpath_switchid()
+            self.fabricpath_switchid_diff_dict = self.__find_fabricpath_switchid_diff()
+            return None
+        else:
+            print("The original fabricpath switch-id of {} have not been learned yet. Therefore, please learn the original fabricpath switch-id before learning the current.".format(
+                self.device.hostname))
+            return None
+
+    def __find_fabricpath_switchid_diff(self):
+        fabricpath_switchid_diff_dict = {}
+        lost_switchid_dict = {}
+        for key, value in self.fabricpath_switchid_dict_original["data"].items():
+            if key not in self.fabricpath_switchid_dict_current["data"].keys():
+                lost_switchid_dict[key] = value.copy()
+            else:
+                for ori_key, ori_value in value.items():
+                    if self.fabricpath_switchid_dict_current["data"][key][ori_key] != ori_value:
+                        fabricpath_switchid_diff_dict[key] = self.fabricpath_switchid_dict_current["data"][key]
+                        continue
+
+        if len(lost_switchid_dict) > 0:
+            fabricpath_switchid_diff_dict["List of switch-id not found in current state"] = lost_switchid_dict
+
+        return fabricpath_switchid_diff_dict
+
+    def is_changed(self) -> bool:
+        if hasattr(self, "fabricpath_switchid_diff_dict"):
+            if len(self.fabricpath_switchid_diff_dict) == 0:
+                return False
+            else:
+                return True
+        else:
+            return False
+
+    def diff(self) -> str:
+        if hasattr(self, "fabricpath_switchid_diff_dict"):
+            string = ""
+            if "List of switch-id not found in current state" in self.fabricpath_switchid_diff_dict:
+                string = string + "List of switch-id not found in current state:\n"
+                for key, value in self.fabricpath_switchid_diff_dict["List of switch-id not found in current state"].items():
+                    string = string + "   switch-id {}\n".format(key)
+                    for in_key, in_value in value.items():
+                        string = string + \
+                            "      {}: {}\n".format(in_key, in_value)
+                    string = string + "\n"
+
+            if len(self.fabricpath_switchid_diff_dict) > 1 or (len(self.fabricpath_switchid_diff_dict) == 1 and "List of switch-id not found in current state" not in self.fabricpath_switchid_diff_dict):
+                string = string + "List of switch-id information has been changed:\n"
+                for key, value in self.fabricpath_switchid_diff_dict.items():
+                    if key != "List of switch-id not found in current state":
+                        string = string + "   switch-id {}\n".format(key)
+                        for in_key, in_value in value.items():
+                            string = string + \
+                                "      {}: {}\n".format(in_key, in_value)
+            return string
+        else:
+            return ""
+
+
+@ decorator_instance
 class FabricpathAdjacencyMonitor:
 
     def __init__(self, device) -> None:
         self.device = device
 
-    def learn_fabricpath(self):
+    def learn_fabricpath_adjacency(self):
 
         fabricpath_adjacency_dict = dict()
 
@@ -220,7 +344,7 @@ class FabricpathAdjacencyMonitor:
     def original(self) -> None:
 
         if not have_original_dir:
-            self.fabricpath_adjacency_dict_original = self.learn_fabricpath()
+            self.fabricpath_adjacency_dict_original = self.learn_fabricpath_adjacency()
             with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(
                     self.fabricpath_adjacency_dict_original, indent=4))
@@ -246,11 +370,11 @@ class FabricpathAdjacencyMonitor:
     def current(self) -> None:
 
         if hasattr(self, "fabricpath_adjacency_dict_original"):
-            self.fabricpath_adjacency_dict_current = self.learn_fabricpath()
+            self.fabricpath_adjacency_dict_current = self.learn_fabricpath_adjacency()
             self.fabricpath_down_dict, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
             return None
         else:
-            print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
+            print("The original fabricpath adjacency of {} have not been learned yet. Therefore, please learn the original fabricpath adjacency before learning the current.".format(
                 self.device.hostname))
             return None
 
@@ -287,7 +411,7 @@ class FabricpathAdjacencyMonitor:
     def diff(self) -> str:
 
         if hasattr(self, "fabricpath_down_dict") and hasattr(self, "delta_fabricpath") and hasattr(self, "percentage_delta_fabricpath"):
-            string = "There are {} ({}%) fabricpath changed to down.\nList of the fabricpath changed to down:\n".format(
+            string = "There are {} ({}%) fabricpath adjacency changed to down.\nList of the fabricpath adjacency changed to down:\n".format(
                 self.delta_fabricpath, self.percentage_delta_fabricpath)
             if len(self.fabricpath_down_dict) > 0:
                 for key, value in self.fabricpath_down_dict.items():
@@ -301,7 +425,7 @@ class FabricpathAdjacencyMonitor:
                 string = string + "   None\n"
                 return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
@@ -421,7 +545,7 @@ class VlanMonitor:
                 string = string + "   None\n"
                 return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
@@ -525,7 +649,7 @@ class FdbMonitor:
             string = string + "\n"
             return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
@@ -641,7 +765,7 @@ class ArpMonitor:
             string = string + "\n"
             return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
@@ -742,7 +866,7 @@ class RoutingMonitor:
             string = string + "\n"
             return string
         else:
-            return None
+            return ""
 
 
 @decorator_instance
@@ -952,7 +1076,7 @@ class OspfMonitor:
                 string = string + "   None\n"
                 return string
         else:
-            return None
+            return ""
 
 
 class AllDetail:
