@@ -16,7 +16,6 @@
 
 from genie import testbed
 from genie.ops.utils import get_ops
-from genie import parsergen
 from genie.libs.parser.utils import get_parser_exclude
 from genie.utils.diff import Diff
 from unicon.core.errors import ConnectionError
@@ -28,7 +27,6 @@ import sys
 import re
 from getpass import getpass
 import json
-from pprint import pprint
 
 
 class_list = list()
@@ -178,7 +176,7 @@ class InterfaceMonitor:
 
 @decorator_instance
 class FabricpathSwitchidMonitor:
-    # __init__ need to have two arguments. The device will be passed when create an instance.
+
     def __init__(self, device) -> None:
         self.device = device
 
@@ -214,7 +212,7 @@ class FabricpathSwitchidMonitor:
         return fabricpath_switchid_dict
 
     def original(self) -> None:
-        # This function should assign original state to local object variable and return None.
+
         if not have_original_dir:
             self.fabricpath_switchid_dict_original = self.learn_fabricpath_switchid()
             with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_create), 'w') as f:
@@ -235,7 +233,14 @@ class FabricpathSwitchidMonitor:
                 unsupport_list.append("FabricpathSwitchidMonitor_instance")
                 return None
 
-        if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["data"]) == 0:
+        if len(self.fabricpath_switchid_dict_original) == 0:
+            unsupport_list.append("FabricpathSwitchidMonitor_instance")
+            return None
+        try:
+            if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["data"]) == 0:
+                unsupport_list.append("FabricpathSwitchidMonitor_instance")
+                return None
+        except:
             unsupport_list.append("FabricpathSwitchidMonitor_instance")
             return None
 
@@ -333,7 +338,7 @@ class FabricpathAdjacencyMonitor:
             raise KeyboardInterrupt
         except:
             print(
-                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath.\n".format(
+                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath adjacency.\n".format(
                     cmd
                 )
             )
@@ -1530,7 +1535,8 @@ def main():
 
             if is_changed:
                 for key, value in instance_monitor_dict.items():
-                    string = string + value.diff()
+                    if value.is_changed():
+                        string = string + value.diff()
             else:
                 string = string + "{} does not change.\n".format(
                     device.device.hostname)
