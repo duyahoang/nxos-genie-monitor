@@ -40,6 +40,7 @@ dir_original_snapshot_create = str()
 
 
 def decorator_instance(class_monitor):
+    global class_list
     class_list.append(class_monitor)
     return class_monitor
 
@@ -66,6 +67,7 @@ class Device:
                 )
             )
             self.device.connect(log_stdout=False, prompt_recovery=True)
+            # self.device.connect(log_stdout=False, prompt_recovery=True)
             # self.device.connect(via="vty", pool_size=10, log_stdout=False, prompt_recovery=True)
 
 
@@ -131,7 +133,8 @@ class InterfaceMonitor:
 
         if hasattr(self, "intf_up_list_original"):
             self.intf_up_list_current = self.learn_interfaces()
-            self.intf_down_list, self.delta_intf, self.percentage_delta_intf = self.__find_interfaces_down()
+            if "InterfaceMonitor_instance" not in unsupport_list:
+                self.intf_down_list, self.delta_intf, self.percentage_delta_intf = self.__find_interfaces_down()
             return None
         else:
             print("The original interfaces of {} have not been learned yet. Therefore, please learn the original interfaces before learning the current.".format(
@@ -188,10 +191,8 @@ class FabricpathSwitchidMonitor:
             output = self.device.execute(cmd)
 
             output_dict = json.loads(output)
-            fabricpath_switchid_dict["data"] = {}
-            for element in output_dict["TABLE_swid"]["ROW_swid"]:
-                fabricpath_switchid_dict["data"][element["swid-value"]
-                                                 ] = element.copy()
+            fabricpath_switchid_dict["show fabricpath switch-id"] = {}
+            fabricpath_switchid_dict["show fabricpath switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
 
             fabricpath_switchid_dict["local_swid_present"] = output_dict["local_swid_present"]
             fabricpath_switchid_dict["number_switch-ids"] = output_dict["no_switch-ids"]
@@ -218,7 +219,6 @@ class FabricpathSwitchidMonitor:
             with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(
                     self.fabricpath_switchid_dict_original, indent=4))
-
         else:
             try:
                 if os.path.isfile("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import)):
@@ -226,6 +226,7 @@ class FabricpathSwitchidMonitor:
                     with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import), 'r') as f:
                         self.fabricpath_switchid_dict_original = json.load(f)
                 else:
+
                     unsupport_list.append(
                         "FabricpathSwitchidMonitor_instance")
                     return None
@@ -236,8 +237,9 @@ class FabricpathSwitchidMonitor:
         if len(self.fabricpath_switchid_dict_original) == 0:
             unsupport_list.append("FabricpathSwitchidMonitor_instance")
             return None
+
         try:
-            if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["data"]) == 0:
+            if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["show fabricpath switch-id"]) == 0:
                 unsupport_list.append("FabricpathSwitchidMonitor_instance")
                 return None
         except:
@@ -247,33 +249,28 @@ class FabricpathSwitchidMonitor:
     def current(self) -> None:
         if hasattr(self, "fabricpath_switchid_dict_original"):
             self.fabricpath_switchid_dict_current = self.learn_fabricpath_switchid()
-            self.fabricpath_switchid_diff_dict = self.__find_fabricpath_switchid_diff()
+            if "FabricpathSwitchidMonitor_instance" not in unsupport_list:
+                self.fabricpath_switchid_diff_dict = self.__find_fabricpath_switchid_diff()
             return None
         else:
+
             print("The original fabricpath switch-id of {} have not been learned yet. Therefore, please learn the original fabricpath switch-id before learning the current.".format(
                 self.device.hostname))
             return None
 
     def __find_fabricpath_switchid_diff(self):
         fabricpath_switchid_diff_dict = {}
-        lost_switchid_dict = {}
-        for key, value in self.fabricpath_switchid_dict_original["data"].items():
-            if key not in self.fabricpath_switchid_dict_current["data"].keys():
-                lost_switchid_dict[key] = value.copy()
-            else:
-                for ori_key, ori_value in value.items():
-                    if self.fabricpath_switchid_dict_current["data"][key][ori_key] != ori_value:
-                        fabricpath_switchid_diff_dict[key] = self.fabricpath_switchid_dict_current["data"][key]
-                        continue
+        fabricpath_switchid_diff_dict["num_switchid_lost"] = 0
+        delta = int(self.fabricpath_switchid_dict_current["number_switch-ids"]) - \
+            int(self.fabricpath_switchid_dict_original["number_switch-ids"])
 
-        if len(lost_switchid_dict) > 0:
-            fabricpath_switchid_diff_dict["List of switch-id not found in current state"] = lost_switchid_dict
+        fabricpath_switchid_diff_dict["num_switchid_lost"] = delta
 
         return fabricpath_switchid_diff_dict
 
     def is_changed(self) -> bool:
         if hasattr(self, "fabricpath_switchid_diff_dict"):
-            if len(self.fabricpath_switchid_diff_dict) == 0:
+            if int(self.fabricpath_switchid_diff_dict["num_switchid_lost"]) == 0:
                 return False
             else:
                 return True
@@ -282,24 +279,8 @@ class FabricpathSwitchidMonitor:
 
     def diff(self) -> str:
         if hasattr(self, "fabricpath_switchid_diff_dict"):
-            string = ""
-            if "List of switch-id not found in current state" in self.fabricpath_switchid_diff_dict:
-                string = string + "List of switch-id not found in current state:\n"
-                for key, value in self.fabricpath_switchid_diff_dict["List of switch-id not found in current state"].items():
-                    string = string + "   switch-id {}\n".format(key)
-                    for in_key, in_value in value.items():
-                        string = string + \
-                            "      {}: {}\n".format(in_key, in_value)
-                    string = string + "\n"
-
-            if len(self.fabricpath_switchid_diff_dict) > 1 or (len(self.fabricpath_switchid_diff_dict) == 1 and "List of switch-id not found in current state" not in self.fabricpath_switchid_diff_dict):
-                string = string + "List of switch-id information has been changed:\n"
-                for key, value in self.fabricpath_switchid_diff_dict.items():
-                    if key != "List of switch-id not found in current state":
-                        string = string + "   switch-id {}\n".format(key)
-                        for in_key, in_value in value.items():
-                            string = string + \
-                                "      {}: {}\n".format(in_key, in_value)
+            string = "There are {} switch-id lost in the fabricpath.".format(
+                self.fabricpath_switchid_diff_dict["num_switchid_lost"])
             return string
         else:
             return ""
@@ -376,7 +357,8 @@ class FabricpathAdjacencyMonitor:
 
         if hasattr(self, "fabricpath_adjacency_dict_original"):
             self.fabricpath_adjacency_dict_current = self.learn_fabricpath_adjacency()
-            self.fabricpath_down_dict, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
+            if "FabricpathAdjacencyMonitor_instance" not in unsupport_list:
+                self.fabricpath_down_dict, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
             return None
         else:
             print("The original fabricpath adjacency of {} have not been learned yet. Therefore, please learn the original fabricpath adjacency before learning the current.".format(
@@ -495,7 +477,8 @@ class VlanMonitor:
     def current(self):
         if hasattr(self, "vlan_dict_original"):
             self.vlan_dict_current = self.learn_vlans()
-            self.vlan_change_list, self.delta_vlan, self.percentage_delta_vlan = self.__find_vlans_change()
+            if "VlanMonitor_instance" not in unsupport_list:
+                self.vlan_change_list, self.delta_vlan, self.percentage_delta_vlan = self.__find_vlans_change()
             return None
         else:
             print("The original VLANs of {} have not been learned yet. Therefore, please learn the original VLANs before learning the current.".format(
@@ -617,7 +600,8 @@ class FdbMonitor:
     def current(self):
         if hasattr(self, "total_mac_addresses_original"):
             self.total_mac_addresses_current = self.learn_fdb()
-            self.delta_mac, self.percentage_delta_mac = self.__find_delta()
+            if "FdbMonitor_instance" not in unsupport_list:
+                self.delta_mac, self.percentage_delta_mac = self.__find_delta()
             return None
         else:
             print("The original FDB - MAC Address table of {} have not been learned yet. Therefore, please learn the original FDB - MAC Address table before learning the current.".format(
@@ -733,7 +717,8 @@ class ArpMonitor:
     def current(self):
         if hasattr(self, "arp_entries_original"):
             self.arp_entries_current = self.learn_arp()
-            self.delta_arp, self.percentage_delta_arp = self.__find_delta()
+            if "ArpMonitor_instance" not in unsupport_list:
+                self.delta_arp, self.percentage_delta_arp = self.__find_delta()
             return None
         else:
             print("The original ARP table of {} have not been learned yet. Therefore, please learn the original ARP table before learning the current.".format(
@@ -834,7 +819,8 @@ class RoutingMonitor:
     def current(self):
         if hasattr(self, "num_routes_original"):
             self.num_routes_current = self.learn_routing()
-            self.delta_routes, self.percentage_delta_routes = self.__find_delta()
+            if "RoutingMonitor_instance" not in unsupport_list:
+                self.delta_routes, self.percentage_delta_routes = self.__find_delta()
             return None
         else:
             print("The original Routing table of {} have not been learned yet. Therefore, please learn the original Routing table before learning the current.".format(
@@ -984,7 +970,8 @@ class OspfMonitor:
         if hasattr(self, "ospf_neighbor_list_original"):
 
             self.ospf_neighbor_list_current = self.learn_ospf()
-            self.neighbor_change_list, self.delta_ospf, self.percentage_delta_ospf = self.__find_ospf_neighbors_change()
+            if "OspfMonitor_instance" not in unsupport_list:
+                self.neighbor_change_list, self.delta_ospf, self.percentage_delta_ospf = self.__find_ospf_neighbors_change()
             return None
         else:
             print("The original OSPF of {} have not been learned yet. Therefore, please learn the original OSPF before learning the current.".format(
@@ -1068,7 +1055,7 @@ class OspfMonitor:
 
     def diff(self):
         if hasattr(self, "neighbor_change_list") and hasattr(self, "delta_ospf") and hasattr(self, "percentage_delta_ospf"):
-            string = "\nThere are {} OSPF neighbors' state have been changed.\nList of the OSPF neighbors' state have been changed:\n".format(
+            string = "\nThere are {} OSPF neighbors' state have been changed:\n".format(
                 self.delta_ospf)
             if len(self.neighbor_change_list) > 0:
                 for neighbor_dict in self.neighbor_change_list:
@@ -1411,7 +1398,7 @@ def main():
 
     device = Device(testbed_dict)
 
-    global lost_mac_safe, lost_arp_safe, lost_routes_safe, dir_original_snapshot_create
+    global unsupport_list, lost_mac_safe, lost_arp_safe, lost_routes_safe, dir_original_snapshot_create
     lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
 
     try:
@@ -1472,10 +1459,6 @@ def main():
                 )
             )
 
-            # print(unsupport_list)
-            for unsupport in unsupport_list:
-                instance_monitor_dict.pop(unsupport, None)
-
             print("The program is learning {}'s all details for the original state...".format(
                 device.device.hostname))
             now1 = datetime.now()
@@ -1510,15 +1493,16 @@ def main():
             if not device.device.is_connected():
                 device.make_connection()
 
-            # runThreadPoolExecutor(instance_monitor_dict, "current")
-            for instance in instance_monitor_dict.values():
-                instance.current()
+            print("List of feature that are not supported by {}:".format(
+                device.device.hostname))
+            print(unsupport_list)
 
-            # print(unsupport_list)
-            for unsupport in unsupport_list:
-                instance_monitor_dict.pop(unsupport, None)
+            for instance_name, instance in instance_monitor_dict.items():
+                if instance_name not in unsupport_list:
+                    instance.current()
 
-            if not instance_monitor_dict:
+            # if not instance_monitor_dict:
+            if len(instance_monitor_dict) == len(set(unsupport_list)):
                 print("\nThe {} device does not support any monitoring category in this tool.\n".format(
                     device.device.hostname))
                 sys.exit()
@@ -1598,7 +1582,6 @@ def main():
                     is_detail = True
                 else:
                     is_detail = False
-            device.device.disconnect_all()
 
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
@@ -1607,20 +1590,20 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
+    # try:
 
-        # Uncomment six lines below to import and decorate classes from extra.py
-        # import inspect
-        # import extra
-        # extra_class_list = [m[1] for m in inspect.getmembers(
-        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-        # for extraClass in extra_class_list:
-        #     extraClass = decorator_instance(extraClass)
+    # Uncomment six lines below to import and decorate classes from extra.py
+    # import inspect
+    # import extra
+    # extra_class_list = [m[1] for m in inspect.getmembers(
+    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+    # for extraClass in extra_class_list:
+    #     extraClass = decorator_instance(extraClass)
 
-        main()
-    except SystemExit:
-        sys.exit()
-    except:
-        print("\nSomethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    main()
+    # except SystemExit:
+    #     sys.exit()
+    # except:
+    #     print("\nSomethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
