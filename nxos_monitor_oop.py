@@ -27,7 +27,6 @@ import sys
 import re
 from getpass import getpass
 import json
-from pprint import pprint
 
 
 class_list = []
