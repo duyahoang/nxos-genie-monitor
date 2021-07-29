@@ -335,7 +335,7 @@ class FabricpathMonitor:
             fabricpath_dict["show fabricpath switch-id"]["local_swid_present"] = output_dict["local_swid_present"]
             fabricpath_dict["show fabricpath switch-id"]["number_switch-ids"] = output_dict["no_switch-ids"]
 
-            if output_dict["no_switch-ids"] > 0:
+            if int(output_dict["no_switch-ids"]) > 0:
                 if type(output_dict["TABLE_swid"]["ROW_swid"]) == list:
                     fabricpath_dict["show fabricpath switch-id"]["list switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
                 elif type(output_dict["TABLE_swid"]["ROW_swid"]) == dict:
