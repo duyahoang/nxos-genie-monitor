@@ -330,10 +330,18 @@ class FabricpathMonitor:
             cmd = "show fabricpath switch-id | json"
             output = self.device.execute(cmd)
             output_dict = json.loads(output)
-            fabricpath_dict["show fabricpath switch-id"] = {}
-            fabricpath_dict["show fabricpath switch-id"]["list switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
+            fabricpath_dict["show fabricpath switch-id"] = {
+                "list switch-id": []}
             fabricpath_dict["show fabricpath switch-id"]["local_swid_present"] = output_dict["local_swid_present"]
             fabricpath_dict["show fabricpath switch-id"]["number_switch-ids"] = output_dict["no_switch-ids"]
+
+            if output_dict["no_switch-ids"] > 0:
+                if type(output_dict["TABLE_swid"]["ROW_swid"]) == list:
+                    fabricpath_dict["show fabricpath switch-id"]["list switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
+                elif type(output_dict["TABLE_swid"]["ROW_swid"]) == dict:
+                    if "swid-value" in output_dict["TABLE_swid"]["ROW_swid"].keys():
+                        fabricpath_dict["show fabricpath switch-id"]["list switch-id"].append(
+                            output_dict["TABLE_swid"]["ROW_swid"].copy())
 
             cmd = "show fabricpath isis adjacency"
             output = self.device.parse(cmd)
@@ -352,31 +360,58 @@ class FabricpathMonitor:
             output = self.device.execute(cmd)
             output_dict = json.loads(output)
             fabricpath_dict["show fabricpath isis interface brief"] = {}
-            interfaces_list = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-name-out"]
-            for i in range(len(interfaces_list)):
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]] = {
-                }
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-type-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["idx"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ix-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-state-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["ready-state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ready-state-out"][i]
-                # fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]]["cid"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-cid-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["circuit-type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ckt-type-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["mtu"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-mtu-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["metric"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-metric-lvl-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["priority"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-prio-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["adjacencies"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-count-out"][i]
-                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
-                                                                        ]["adjacencies-up"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-up-count-out"][i]
+            if "intf-name-out" in output_dict["TABLE_process_tag"]["ROW_process_tag"].keys():
+                if type(output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-name-out"]) == list:
+                    interfaces_list = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-name-out"]
+                    for i in range(len(interfaces_list)):
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]] = {
+                        }
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-type-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["idx"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ix-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-state-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["ready-state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ready-state-out"][i]
+                        # fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]]["cid"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-cid-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["circuit-type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ckt-type-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["mtu"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-mtu-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["metric"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-metric-lvl-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["priority"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-prio-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["adjacencies"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-count-out"][i]
+                        fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                                ]["adjacencies-up"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-up-count-out"][i]
+                else:
+                    interface = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-name-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface] = {
+                    }
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-type-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["idx"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ix-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-state-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["ready-state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ready-state-out"]
+                    # fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]]["cid"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-cid-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["circuit-type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ckt-type-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["mtu"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-mtu-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["metric"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-metric-lvl-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["priority"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-prio-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["adjacencies"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-count-out"]
+                    fabricpath_dict["show fabricpath isis interface brief"][interface
+                                                                            ]["adjacencies-up"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-up-count-out"]
 
             return fabricpath_dict
 
@@ -1723,20 +1758,21 @@ def main():
 
 
 if __name__ == '__main__':
-    # try:
+    try:
 
-    # Uncomment six lines below to import and decorate classes from extra.py
-    # import inspect
-    # import extra
-    # extra_class_list = [m[1] for m in inspect.getmembers(
-    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-    # for extraClass in extra_class_list:
-    #     extraClass = decorator_instance(extraClass)
+        # Uncomment six lines below to import and decorate classes from extra.py
+        # import inspect
+        # import extra
+        # extra_class_list = [m[1] for m in inspect.getmembers(
+        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+        # for extraClass in extra_class_list:
+        #     extraClass = decorator_instance(extraClass)
 
-    main()
-    # except SystemExit:
-    #     sys.exit()
-    # except:
-    #     print("\nSomethings went wrong.")
-    #     print("Unexpected error:", sys.exc_info()[0])
-    #     sys.exit()
+        main()
+
+    except SystemExit:
+        sys.exit()
+    except:
+        print("\nSomethings went wrong.")
+        print("Unexpected error:", sys.exc_info()[0])
+        sys.exit()
