@@ -27,22 +27,58 @@ import sys
 import re
 from getpass import getpass
 import json
+from pprint import pprint
 
 
-class_list = list()
-unsupport_list = list()
+class_list = []
+unsupport_list = []
 lost_mac_safe = 0
 lost_arp_safe = 0
 lost_routes_safe = 0
 have_original_dir = False
-dir_original_snapshot_import = str()
-dir_original_snapshot_create = str()
+dir_original_snapshot_import = ""
+dir_original_snapshot_create = ""
 
 
 def decorator_instance(class_monitor):
     global class_list
     class_list.append(class_monitor)
     return class_monitor
+
+
+def comparedict(original_dict, current_dict, key_list):
+    diff_dict = {}
+    diff_dict["Missing keys"] = {}
+    diff_dict["Changed values"] = {}
+    diff_dict["Missing delta"] = 0
+    diff_dict["Changed delta"] = 0
+    diff_dict["Total delta"] = 0
+    diff_dict["Percentage delta"] = 0
+
+    for key in original_dict:
+        if key not in current_dict.keys():
+            diff_dict["Missing keys"][key] = original_dict[key].copy()
+            diff_dict["Missing delta"] = diff_dict["Missing delta"] + 1
+        else:
+            for in_key, in_value in original_dict[key].items():
+                if in_key not in key_list:
+                    continue
+                else:
+                    if in_value != current_dict[key][in_key]:
+                        value_dict = {in_key: {}}
+                        value_dict[in_key]["original"] = original_dict[key][in_key]
+                        value_dict[in_key]["current"] = current_dict[key][in_key]
+                        diff_dict["Changed values"][key] = value_dict
+
+                        diff_dict["Changed delta"] = diff_dict["Changed delta"] + 1
+
+    diff_dict["Total delta"] = diff_dict["Missing delta"] + \
+        diff_dict["Changed delta"]
+    if len(original_dict) != 0:
+        diff_dict["Percentage delta"] = (diff_dict["Total delta"] /
+                                         len(original_dict))*100
+
+    return diff_dict
 
 
 class Device:
@@ -72,6 +108,109 @@ class Device:
 
 
 @decorator_instance
+class FeatureMonitor:
+    def __init__(self, device) -> None:
+        self.device = device
+
+    def learn_feature(self):
+        feature_enabled = []
+        try:
+            cmd = "show feature"
+            output = self.device.parse(cmd)
+            for key, value in output["feature"].items():
+                for in_value in value["instance"].values():
+                    if in_value["state"] == "enabled":
+                        feature_enabled.append(key)
+                        break
+
+            cmd = "show feature-set"
+            output = self.device.parse(cmd)
+            for key, value in output["feature"].items():
+                for in_value in value["instance"].values():
+                    if in_value["state"] == "enabled":
+                        feature_enabled.append(key)
+                        break
+
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            unsupport_list.append("FeatureMonitor_instance")
+            print("Cannot monitor feature.")
+        return feature_enabled
+
+    def original(self):
+        if not have_original_dir:
+            self.feature_enabled_original = self.learn_feature()
+
+            with open("{}/feature_enabled.json".format(dir_original_snapshot_create), 'w') as f:
+                f.write(json.dumps(self.feature_enabled_original, indent=4))
+
+        else:
+            try:
+                if os.path.isfile("{}/feature_enabled.json".format(dir_original_snapshot_import)):
+                    with open("{}/feature_enabled.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.feature_enabled_original = json.load(f)
+                else:
+                    unsupport_list.append("FeatureMonitor_instance")
+                    return None
+            except:
+                unsupport_list.append("FeatureMonitor_instance")
+                return None
+
+        if len(self.feature_enabled_original) == 0:
+            unsupport_list.append("FeatureMonitor_instance")
+            return None
+
+    def current(self):
+        if hasattr(self, "feature_enabled_original"):
+            self.feature_enabled_current = self.learn_feature()
+            if "FeatureMonitor_instance" not in unsupport_list:
+                self.feature_changed, self.delta_feature, self.percentage_delta_feature = self.__find_feature_diff()
+        else:
+            print("The original feature of {} have not been learned yet. Therefore, please learn the original feature before learning the current.".format(
+                self.device.hostname))
+
+        return None
+
+    def __find_feature_diff(self):
+        feature_changed = []
+        for feature in self.feature_enabled_original:
+            if feature not in self.feature_enabled_current:
+                feature_changed.append(feature)
+
+        delta_feature = len(feature_changed)
+        percentage_delta_feature = 0
+        if len(self.feature_enabled_original) != 0:
+            percentage_delta_feature = (delta_feature /
+                                        len(self.feature_enabled_original)) * 100
+
+        return (feature_changed, delta_feature, percentage_delta_feature)
+
+    def is_changed(self):
+        if hasattr(self, "feature_changed"):
+            if (self.delta_feature) > 0:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def diff(self):
+        string = ""
+        if hasattr(self, "feature_changed") and hasattr(self, "delta_feature") and hasattr(self, "percentage_delta_feature"):
+            string = "List of the feature changed to disabled:\n"
+            if self.delta_feature > 0:
+                for feature in self.feature_changed:
+                    string = string + "   {}\n".format(feature)
+            else:
+                string = string + "   None\n"
+
+        return string
+
+
+@decorator_instance
 class InterfaceMonitor:
 
     def __init__(self, device):
@@ -83,7 +222,7 @@ class InterfaceMonitor:
         num_intf_up = 0
         intf_up_list = []
         try:
-            Interface = get_ops('interface', self.device)
+            Interface = get_ops("interface", self.device)
             interface_object = Interface(device=self.device)
             interface_object.learn()
 
@@ -178,24 +317,69 @@ class InterfaceMonitor:
 
 
 @decorator_instance
-class FabricpathSwitchidMonitor:
+class FabricpathMonitor:
 
     def __init__(self, device) -> None:
         self.device = device
+        self.unsupport = False
 
-    def learn_fabricpath_switchid(self):
+    def learn_fabricpath(self):
 
-        fabricpath_switchid_dict = {}
+        fabricpath_dict = {}
+
         try:
             cmd = "show fabricpath switch-id | json"
             output = self.device.execute(cmd)
-
             output_dict = json.loads(output)
-            fabricpath_switchid_dict["show fabricpath switch-id"] = {}
-            fabricpath_switchid_dict["show fabricpath switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
+            fabricpath_dict["show fabricpath switch-id"] = {}
+            fabricpath_dict["show fabricpath switch-id"]["list switch-id"] = output_dict["TABLE_swid"]["ROW_swid"].copy()
+            fabricpath_dict["show fabricpath switch-id"]["local_swid_present"] = output_dict["local_swid_present"]
+            fabricpath_dict["show fabricpath switch-id"]["number_switch-ids"] = output_dict["no_switch-ids"]
 
-            fabricpath_switchid_dict["local_swid_present"] = output_dict["local_swid_present"]
-            fabricpath_switchid_dict["number_switch-ids"] = output_dict["no_switch-ids"]
+            cmd = "show fabricpath isis adjacency"
+            output = self.device.parse(cmd)
+            if len(output) < 1:
+                fabricpath_dict["show fabricpath isis adjacency"] = "Not support"
+            elif len(output["domain"]) < 1:
+                fabricpath_dict["show fabricpath isis adjacency"] = "Not support"
+            else:
+                fabricpath_dict["show fabricpath isis adjacency"] = {}
+                for key in output["domain"]:
+                    if "interfaces" in output["domain"][key].keys():
+                        for inside_key in output["domain"][key]["interfaces"]:
+                            fabricpath_dict["show fabricpath isis adjacency"][inside_key] = output["domain"][key]["interfaces"][inside_key]
+
+            cmd = "show fabricpath isis interface brief | json"
+            output = self.device.execute(cmd)
+            output_dict = json.loads(output)
+            fabricpath_dict["show fabricpath isis interface brief"] = {}
+            interfaces_list = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-name-out"]
+            for i in range(len(interfaces_list)):
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]] = {
+                }
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-type-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["idx"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ix-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-state-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["ready-state"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ready-state-out"][i]
+                # fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]]["cid"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-cid-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["circuit-type"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-ckt-type-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["mtu"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-mtu-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["metric"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-metric-lvl-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["priority"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-prio-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["adjacencies"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-count-out"][i]
+                fabricpath_dict["show fabricpath isis interface brief"][interfaces_list[i]
+                                                                        ]["adjacencies-up"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-up-count-out"][i]
+
+            return fabricpath_dict
 
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
@@ -208,69 +392,117 @@ class FabricpathSwitchidMonitor:
                     cmd
                 )
             )
-            unsupport_list.append("FabricpathSwitchidMonitor_instance")
+            self.unsupport = True
 
-        return fabricpath_switchid_dict
+        return fabricpath_dict
 
     def original(self) -> None:
 
         if not have_original_dir:
-            self.fabricpath_switchid_dict_original = self.learn_fabricpath_switchid()
-            with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_create), 'w') as f:
+            self.fabricpath_dict_original = self.learn_fabricpath()
+            with open("{}/fabricpath.json".format(dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(
-                    self.fabricpath_switchid_dict_original, indent=4))
+                    self.fabricpath_dict_original, indent=4))
         else:
             try:
-                if os.path.isfile("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import)):
+                if os.path.isfile("{}/fabricpath.json".format(dir_original_snapshot_import)):
 
-                    with open("{}/fabricpath_switchid_dict.json".format(dir_original_snapshot_import), 'r') as f:
-                        self.fabricpath_switchid_dict_original = json.load(f)
+                    with open("{}/fabricpath.json".format(dir_original_snapshot_import), 'r') as f:
+                        self.fabricpath_dict_original = json.load(f)
                 else:
 
                     unsupport_list.append(
-                        "FabricpathSwitchidMonitor_instance")
+                        "FabricpathMonitor_instance")
                     return None
             except:
-                unsupport_list.append("FabricpathSwitchidMonitor_instance")
+                unsupport_list.append("FabricpathMonitor_instance")
                 return None
 
-        if len(self.fabricpath_switchid_dict_original) == 0:
-            unsupport_list.append("FabricpathSwitchidMonitor_instance")
-            return None
-
-        try:
-            if self.fabricpath_switchid_dict_original["number_switch-ids"] == 0 or len(self.fabricpath_switchid_dict_original["show fabricpath switch-id"]) == 0:
-                unsupport_list.append("FabricpathSwitchidMonitor_instance")
-                return None
-        except:
-            unsupport_list.append("FabricpathSwitchidMonitor_instance")
+        if len(self.fabricpath_dict_original) == 0:
+            unsupport_list.append("FabricpathMonitor_instance")
             return None
 
     def current(self) -> None:
-        if hasattr(self, "fabricpath_switchid_dict_original"):
-            self.fabricpath_switchid_dict_current = self.learn_fabricpath_switchid()
-            if "FabricpathSwitchidMonitor_instance" not in unsupport_list:
-                self.fabricpath_switchid_diff_dict = self.__find_fabricpath_switchid_diff()
+        if hasattr(self, "fabricpath_dict_original"):
+            self.fabricpath_dict_current = self.learn_fabricpath()
+            if not self.unsupport:
+                self.fabricpath_diff_dict = self.__find_fabricpath_diff()
             return None
         else:
 
-            print("The original fabricpath switch-id of {} have not been learned yet. Therefore, please learn the original fabricpath switch-id before learning the current.".format(
+            print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
                 self.device.hostname))
             return None
 
-    def __find_fabricpath_switchid_diff(self):
-        fabricpath_switchid_diff_dict = {}
-        fabricpath_switchid_diff_dict["num_switchid_lost"] = 0
-        delta = int(self.fabricpath_switchid_dict_current["number_switch-ids"]) - \
-            int(self.fabricpath_switchid_dict_original["number_switch-ids"])
+    def __find_fabricpath_diff(self):
+        fabricpath_diff_dict = {}
 
-        fabricpath_switchid_diff_dict["num_switchid_lost"] = delta
+        fabricpath_diff_dict["num_switchid_lost"] = 0
+        delta = int(self.fabricpath_dict_original["show fabricpath switch-id"]["number_switch-ids"]) - int(
+            self.fabricpath_dict_current["show fabricpath switch-id"]["number_switch-ids"])
+        fabricpath_diff_dict["num_switchid_lost"] = delta
 
-        return fabricpath_switchid_diff_dict
+        if self.fabricpath_dict_original["show fabricpath isis adjacency"] == "Not support":
+            fabricpath_diff_dict["Adjacencies lost"] = "Not support"
+        else:
+            fabricpath_adjacency_key = [
+                "state"]
+            fabricpath_adjacency_diff = comparedict(
+                self.fabricpath_dict_original["show fabricpath isis adjacency"], self.fabricpath_dict_current["show fabricpath isis adjacency"], fabricpath_adjacency_key)
+            if fabricpath_adjacency_diff["Total delta"] == 0:
+                fabricpath_diff_dict["Adjacencies lost"] = 0
+            else:
+                if fabricpath_adjacency_diff["Missing delta"] > 0:
+                    fabricpath_diff_dict["Adjacencies lost"] = {}
+                    for key, value in fabricpath_adjacency_diff["Missing keys"].items():
+                        value_dict = {"system_id": value["system_id"],
+                                      "state": "Not found in fabricpath isis adjacency database"}
+                        fabricpath_diff_dict["Adjacencies lost"][key] = value_dict
+                if fabricpath_adjacency_diff["Changed delta"] > 0:
+                    for key, value in fabricpath_adjacency_diff["Changed values"].items():
+                        if "state" in value.keys():
+                            fabricpath_diff_dict["Adjacencies lost"][key] = {}
+                            fabricpath_diff_dict["Adjacencies lost"][key]["system_id"] = self.fabricpath_dict_current[
+                                "show fabricpath isis adjacency"][key]["system_id"]
+                            fabricpath_diff_dict["Adjacencies lost"][key]["state"] = self.fabricpath_dict_current[
+                                "show fabricpath isis adjacency"][key]["state"]
+
+            fabricpath_diff_dict["delta_fabricpath_adjacency"] = fabricpath_adjacency_diff["Total delta"]
+            fabricpath_diff_dict["percentage_delta_fabricpath_adjacency"] = fabricpath_adjacency_diff["Percentage delta"]
+
+        fabricpath_interface_key = ["state", "ready-state"]
+        fabricpath_interface_diff = comparedict(
+            self.fabricpath_dict_original["show fabricpath isis interface brief"], self.fabricpath_dict_current["show fabricpath isis interface brief"], fabricpath_interface_key)
+
+        if fabricpath_interface_diff["Missing delta"] > 0:
+            fabricpath_diff_dict["Interfaces lost"] = {}
+            for key, value in fabricpath_interface_diff["Missing keys"].items():
+                value_dict = {
+                    "state": "Not found in fabricpath isis interface brief"}
+                fabricpath_diff_dict["Interfaces lost"][key] = value_dict
+
+        if fabricpath_interface_diff["Changed delta"] > 0:
+            for key, value in fabricpath_interface_diff["Changed values"].items():
+                if "state" in value.keys() or "ready-state" in value.keys():
+                    fabricpath_diff_dict["Interfaces lost"][key] = {}
+                    fabricpath_diff_dict["Interfaces lost"][key]["state"] = self.fabricpath_dict_current[
+                        "show fabricpath isis interface brief"][key]["state"]
+                    fabricpath_diff_dict["Interfaces lost"][key]["ready-state"] = self.fabricpath_dict_current[
+                        "show fabricpath isis interface brief"][key]["ready-state"]
+        fabricpath_diff_dict["delta_fabricpath_interface"] = fabricpath_interface_diff["Total delta"]
+        fabricpath_diff_dict["percentage_delta_fabricpath_interface"] = fabricpath_interface_diff["Percentage delta"]
+
+        return fabricpath_diff_dict
 
     def is_changed(self) -> bool:
-        if hasattr(self, "fabricpath_switchid_diff_dict"):
-            if int(self.fabricpath_switchid_diff_dict["num_switchid_lost"]) == 0:
+        if hasattr(self, "fabricpath_diff_dict"):
+            if self.fabricpath_diff_dict["Adjacencies lost"] == "Not support":
+                if int(self.fabricpath_diff_dict["num_switchid_lost"]) == 0 and self.fabricpath_diff_dict["delta_fabricpath_interface"] == 0:
+                    return False
+                else:
+                    return True
+
+            if int(self.fabricpath_diff_dict["num_switchid_lost"]) == 0 and self.fabricpath_diff_dict["delta_fabricpath_adjacency"] == 0 and self.fabricpath_diff_dict["delta_fabricpath_interface"] == 0:
                 return False
             else:
                 return True
@@ -278,149 +510,49 @@ class FabricpathSwitchidMonitor:
             return False
 
     def diff(self) -> str:
-        if hasattr(self, "fabricpath_switchid_diff_dict"):
-            string = "There are {} switch-id lost in the fabricpath.".format(
-                self.fabricpath_switchid_diff_dict["num_switchid_lost"])
+        if hasattr(self, "fabricpath_diff_dict"):
+
+            string = "There are {} switch-id lost in the fabricpath.\n".format(
+                self.fabricpath_diff_dict["num_switchid_lost"])
+
+            string = string + "There are {} ({:.2f}%) fabricpath interface have been changed.\n".format(
+                self.fabricpath_diff_dict["delta_fabricpath_interface"], self.fabricpath_diff_dict["percentage_delta_fabricpath_interface"])
+            if self.fabricpath_diff_dict["delta_fabricpath_interface"] > 0:
+                for key, value in self.fabricpath_diff_dict["Interfaces lost"].items():
+                    string = string + \
+                        "   {}\n".format(key)
+                    for in_key, in_value in value.items():
+                        string = string + \
+                            "      {}: {}\n".format(in_key, in_value)
+                    string = string + "\n"
+
+            if self.fabricpath_diff_dict["Adjacencies lost"] == "Not support":
+                pass
+            else:
+                string = string + "There are {} ({:.2f}%) fabricpath adjacency have been changed.\n".format(
+                    self.fabricpath_diff_dict["delta_fabricpath_adjacency"], self.fabricpath_diff_dict["percentage_delta_fabricpath_adjacency"])
+                if self.fabricpath_diff_dict["delta_fabricpath_adjacency"] > 0:
+                    for key, value in self.fabricpath_diff_dict["Adjacencies lost"].items():
+                        string = string + "   {}\n".format(key)
+                        for inside_key, inside_value in value.items():
+                            string = string + \
+                                "      {}: {}\n".format(
+                                    inside_key, inside_value)
+                        string = string + "\n"
+
             return string
+
         else:
             return ""
 
 
 @ decorator_instance
-class FabricpathAdjacencyMonitor:
-
-    def __init__(self, device) -> None:
-        self.device = device
-
-    def learn_fabricpath_adjacency(self):
-
-        fabricpath_adjacency_dict = dict()
-
-        try:
-            cmd = "show fabricpath isis adjacency"
-            output = self.device.parse(cmd)
-
-            if len(output) < 1:
-                return fabricpath_adjacency_dict
-            if len(output["domain"]) < 1:
-                return fabricpath_adjacency_dict
-
-            for key in output["domain"]:
-                if "interfaces" in output["domain"][key].keys():
-                    for inside_key in output["domain"][key]["interfaces"]:
-                        fabricpath_adjacency_dict[inside_key] = output["domain"][key]["interfaces"][inside_key]
-
-            return fabricpath_adjacency_dict
-
-        except ConnectionError:
-            print("\nThe connection is disconnected. The device may be reloading.")
-            raise ConnectionError
-        except KeyboardInterrupt:
-            raise KeyboardInterrupt
-        except:
-            print(
-                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath adjacency.\n".format(
-                    cmd
-                )
-            )
-            unsupport_list.append("FabricpathAdjacencyMonitor_instance")
-
-        return fabricpath_adjacency_dict
-
-    def original(self) -> None:
-
-        if not have_original_dir:
-            self.fabricpath_adjacency_dict_original = self.learn_fabricpath_adjacency()
-            with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_create), 'w') as f:
-                f.write(json.dumps(
-                    self.fabricpath_adjacency_dict_original, indent=4))
-
-        else:
-            try:
-                if os.path.isfile("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_import)):
-
-                    with open("{}/fabricpath_adjacency_dict.json".format(dir_original_snapshot_import), 'r') as f:
-                        self.fabricpath_adjacency_dict_original = json.load(f)
-                else:
-                    unsupport_list.append(
-                        "FabricpathAdjacencyMonitor_instance")
-                    return None
-            except:
-                unsupport_list.append("FabricpathAdjacencyMonitor_instance")
-                return None
-
-        if len(self.fabricpath_adjacency_dict_original) == 0:
-            unsupport_list.append("FabricpathAdjacencyMonitor_instance")
-            return None
-
-    def current(self) -> None:
-
-        if hasattr(self, "fabricpath_adjacency_dict_original"):
-            self.fabricpath_adjacency_dict_current = self.learn_fabricpath_adjacency()
-            if "FabricpathAdjacencyMonitor_instance" not in unsupport_list:
-                self.fabricpath_down_dict, self.delta_fabricpath, self.percentage_delta_fabricpath = self.__find_fabricpath_down()
-            return None
-        else:
-            print("The original fabricpath adjacency of {} have not been learned yet. Therefore, please learn the original fabricpath adjacency before learning the current.".format(
-                self.device.hostname))
-            return None
-
-    def __find_fabricpath_down(self):
-        fabricpath_down_dict = {}
-        for key, value in self.fabricpath_adjacency_dict_original.items():
-
-            if value["state"].lower() != "up":
-                continue
-            else:
-                if key not in self.fabricpath_adjacency_dict_current:
-                    fabricpath_down_dict[key] = value.copy()
-                    fabricpath_down_dict[key]["state"] = "Not found in Fabricpath IS-IS adjacency database"
-                else:
-                    if self.fabricpath_adjacency_dict_current[key]["state"].lower() != "up":
-                        fabricpath_down_dict[key] = self.fabricpath_adjacency_dict_current[key]
-
-        delta_fabricpath = len(fabricpath_down_dict)
-        percentage_delta_fabricpath = (len(fabricpath_down_dict) /
-                                       len(self.fabricpath_adjacency_dict_original)) * 100
-
-        return (fabricpath_down_dict, delta_fabricpath, percentage_delta_fabricpath)
-
-    def is_changed(self) -> bool:
-
-        if hasattr(self, "fabricpath_down_dict"):
-            if len(self.fabricpath_down_dict) > 0:
-                return True
-            else:
-                return False
-        else:
-            return False
-
-    def diff(self) -> str:
-
-        if hasattr(self, "fabricpath_down_dict") and hasattr(self, "delta_fabricpath") and hasattr(self, "percentage_delta_fabricpath"):
-            string = "There are {} ({}%) fabricpath adjacency changed to down.\nList of the fabricpath adjacency changed to down:\n".format(
-                self.delta_fabricpath, self.percentage_delta_fabricpath)
-            if len(self.fabricpath_down_dict) > 0:
-                for key, value in self.fabricpath_down_dict.items():
-                    string = string + "   {}\n".format(key)
-                    for inside_key, inside_value in value.items():
-                        string = string + \
-                            "      {}: {}\n".format(inside_key, inside_value)
-                    string = string + "\n"
-                return string
-            else:
-                string = string + "   None\n"
-                return string
-        else:
-            return ""
-
-
-@decorator_instance
 class VlanMonitor:
 
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_vlans(self) -> dict:
 
@@ -445,7 +577,7 @@ class VlanMonitor:
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("VlanMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor VLANs.")
             return {}
 
@@ -477,8 +609,8 @@ class VlanMonitor:
     def current(self):
         if hasattr(self, "vlan_dict_original"):
             self.vlan_dict_current = self.learn_vlans()
-            if "VlanMonitor_instance" not in unsupport_list:
-                self.vlan_change_list, self.delta_vlan, self.percentage_delta_vlan = self.__find_vlans_change()
+            if not self.unsupport:
+                self.vlan_changed_dict, self.delta_vlan, self.percentage_delta_vlan = self.__find_vlans_change()
             return None
         else:
             print("The original VLANs of {} have not been learned yet. Therefore, please learn the original VLANs before learning the current.".format(
@@ -487,32 +619,30 @@ class VlanMonitor:
 
     def __find_vlans_change(self) -> tuple:
 
-        vlan_change_list = []
-        if len(self.vlan_dict_original) > 0:
-            for vlan_original in list(self.vlan_dict_original.keys()):
-                if self.vlan_dict_original[vlan_original]["state"] != "active":
-                    continue
-                else:
-                    if vlan_original in list(self.vlan_dict_current.keys()):
-                        if self.vlan_dict_current[vlan_original]["state"] != "active":
-                            vlan_change_list.append(
-                                {vlan_original:
-                                    self.vlan_dict_current[vlan_original]}
-                            )
-                    else:
-                        vlan_change_list.append(
-                            {vlan_original: {"state": "Not found in VLAN database"}}
-                        )
+        vlan_changed_dict = {}
+        vlan_exculde = ["state"]
+        result = comparedict(
+            self.vlan_dict_original, self.vlan_dict_current, vlan_exculde)
+        if result["Missing delta"] > 0:
+            for key, value in result["Missing keys"].items():
+                vlan_changed_dict[key] = {}
+                vlan_changed_dict[key]["name"] = value["name"]
+                vlan_changed_dict[key]["state"] = "Not found in VLAN database"
+        if result["Changed delta"] > 0:
+            for key, value in result["Changed values"].items():
+                if "state" in value.keys():
+                    vlan_changed_dict[key] = {}
+                    vlan_changed_dict[key]["name"] = self.vlan_dict_current[key]["name"]
+                    vlan_changed_dict[key]["state"] = self.vlan_dict_current[key]["state"]
 
-            delta_vlan = len(vlan_change_list)
-            percentage_delta_vlan = (
-                len(vlan_change_list) / len(self.vlan_dict_original)) * 100
+        delta_vlan = result["Total delta"]
+        percentage_delta_vlan = result["Percentage delta"]
 
-        return (vlan_change_list, delta_vlan, percentage_delta_vlan)
+        return (vlan_changed_dict, delta_vlan, percentage_delta_vlan)
 
     def is_changed(self):
-        if hasattr(self, "vlan_change_list"):
-            if len(self.vlan_change_list) > 0:
+        if hasattr(self, "vlan_changed_dict"):
+            if self.delta_vlan > 0:
                 return True
             else:
                 return False
@@ -520,28 +650,26 @@ class VlanMonitor:
             return False
 
     def diff(self):
-        if hasattr(self, "vlan_change_list") and hasattr(self, "delta_vlan") and hasattr(self, "percentage_delta_vlan"):
-            string = "List of the vlans changed to down:\n"
-            if len(self.vlan_change_list) > 0:
-                for vlan_dict in self.vlan_change_list:
-                    vlan = list(vlan_dict.keys())[0]
-                    state = vlan_dict[vlan]["state"]
-                    string = string + \
-                        "   VLAN {} - state: {}\n".format(vlan, state)
-                return string
-            else:
-                string = string + "   None\n"
-                return string
-        else:
-            return ""
+        string = ""
+        if hasattr(self, "vlan_changed_dict") and hasattr(self, "delta_vlan") and hasattr(self, "percentage_delta_vlan"):
+            string = "There are {} ({:.2f}%) vlans changed to down:\n".format(
+                self.delta_vlan, self.percentage_delta_vlan)
+            for key, value in self.vlan_changed_dict.items():
+                string = string + "   VLAN {}\n".format(key)
+                for in_key, in_value in value.items():
+                    string = string + "      {}: {}\n".format(in_key, in_value)
+                string = string + "\n"
+
+        return string
 
 
-@decorator_instance
+@ decorator_instance
 class FdbMonitor:
 
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_fdb(self) -> int:
 
@@ -566,7 +694,7 @@ class FdbMonitor:
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("FdbMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor MAC address table.")
             return total_mac_addresses
 
@@ -600,7 +728,7 @@ class FdbMonitor:
     def current(self):
         if hasattr(self, "total_mac_addresses_original"):
             self.total_mac_addresses_current = self.learn_fdb()
-            if "FdbMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.delta_mac, self.percentage_delta_mac = self.__find_delta()
             return None
         else:
@@ -641,12 +769,13 @@ class FdbMonitor:
             return ""
 
 
-@decorator_instance
+@ decorator_instance
 class ArpMonitor:
 
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_arp(self) -> int:
 
@@ -683,7 +812,7 @@ class ArpMonitor:
                     cmd
                 )
             )
-            unsupport_list.append("ArpMonitor_instance")
+            self.unsupport = True
 
         return arp_entries
 
@@ -717,7 +846,7 @@ class ArpMonitor:
     def current(self):
         if hasattr(self, "arp_entries_original"):
             self.arp_entries_current = self.learn_arp()
-            if "ArpMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.delta_arp, self.percentage_delta_arp = self.__find_delta()
             return None
         else:
@@ -758,12 +887,13 @@ class ArpMonitor:
             return ""
 
 
-@decorator_instance
+@ decorator_instance
 class RoutingMonitor:
 
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_routing(self) -> int:
 
@@ -785,7 +915,7 @@ class RoutingMonitor:
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("RoutingMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor routing table.")
         return num_routes
 
@@ -819,7 +949,7 @@ class RoutingMonitor:
     def current(self):
         if hasattr(self, "num_routes_original"):
             self.num_routes_current = self.learn_routing()
-            if "RoutingMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.delta_routes, self.percentage_delta_routes = self.__find_delta()
             return None
         else:
@@ -860,12 +990,13 @@ class RoutingMonitor:
             return ""
 
 
-@decorator_instance
+@ decorator_instance
 class OspfMonitor:
 
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_ospf(self) -> list:
 
@@ -938,7 +1069,7 @@ class OspfMonitor:
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("OspfMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor OSPF neighbors")
         return ospf_neighbor_list
 
@@ -970,7 +1101,7 @@ class OspfMonitor:
         if hasattr(self, "ospf_neighbor_list_original"):
 
             self.ospf_neighbor_list_current = self.learn_ospf()
-            if "OspfMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.neighbor_change_list, self.delta_ospf, self.percentage_delta_ospf = self.__find_ospf_neighbors_change()
             return None
         else:
@@ -1232,7 +1363,7 @@ def get_testbed() -> tuple:
                     print("Your input is invalid. Please enter Y or N.")
                     have_snapshot = input(
                         "Do you have the original snapshot directory (Y or N): ")
-                if exit.upper() == "Y":
+                if have_snapshot.upper() == "Y":
                     dir_original_snapshot_import = input(
                         "Enter the directory original snapshot directory (e.g. /home/script): ")
                     while not os.path.exists("{}".format(dir_original_snapshot_import)):
@@ -1240,12 +1371,15 @@ def get_testbed() -> tuple:
                             dir_original_snapshot_import))
                         dir_original_snapshot_import = input(
                             "Enter the directory original snapshot directory (e.g. /home/script): ")
-
+                    print("The program will use {} as the original snapshot".format(
+                        dir_original_snapshot_import))
                     have_original_dir = True
                 else:
                     print("The program will learn the original snapshot.\n")
                     have_original_dir = False
             else:
+                print("The program will use {} as the original snapshot".format(
+                    dir_original_snapshot_import))
                 have_original_dir = True
         except AttributeError:
             print("\nThe program did not find the orginal snapshot directory in databaseconfig.py.\nThe program will learn the original snapshot and save it in {}.".format(dir_output))
@@ -1493,9 +1627,9 @@ def main():
             if not device.device.is_connected():
                 device.make_connection()
 
-            print("List of feature that are not supported by {}:".format(
-                device.device.hostname))
-            print(unsupport_list)
+            # print("List of feature that are not supported by {}:".format(
+            #     device.device.hostname))
+            # print(unsupport_list)
 
             for instance_name, instance in instance_monitor_dict.items():
                 if instance_name not in unsupport_list:
