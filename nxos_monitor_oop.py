@@ -110,6 +110,7 @@ class Device:
 class FeatureMonitor:
     def __init__(self, device) -> None:
         self.device = device
+        self.unsupport = False
 
     def learn_feature(self):
         feature_enabled = []
@@ -129,13 +130,13 @@ class FeatureMonitor:
                     if in_value["state"] == "enabled":
                         feature_enabled.append(key)
                         break
-
+            self.unsupport = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("FeatureMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor feature.")
         return feature_enabled
 
@@ -165,7 +166,7 @@ class FeatureMonitor:
     def current(self):
         if hasattr(self, "feature_enabled_original"):
             self.feature_enabled_current = self.learn_feature()
-            if "FeatureMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.feature_changed, self.delta_feature, self.percentage_delta_feature = self.__find_feature_diff()
         else:
             print("The original feature of {} have not been learned yet. Therefore, please learn the original feature before learning the current.".format(
@@ -215,10 +216,10 @@ class InterfaceMonitor:
     def __init__(self, device):
 
         self.device = device
+        self.unsupport = False
 
     def learn_interfaces(self) -> list:
 
-        num_intf_up = 0
         intf_up_list = []
         try:
             Interface = get_ops("interface", self.device)
@@ -231,18 +232,15 @@ class InterfaceMonitor:
                     and interface_object.info[intf]["oper_status"] == "up"
                 ):
                     intf_up_list.append(intf)
-                    num_intf_up = num_intf_up + 1
-
-            return intf_up_list
-
+            self.unsupport = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except ConnectionError:
             raise ConnectionError
         except:
-            unsupport_list.append("InterfaceMonitor_instance")
+            self.unsupport = True
             print("Cannot monitor interfaces.")
-            return intf_up_list
+        return intf_up_list
 
     def original(self):
 
@@ -271,7 +269,7 @@ class InterfaceMonitor:
 
         if hasattr(self, "intf_up_list_original"):
             self.intf_up_list_current = self.learn_interfaces()
-            if "InterfaceMonitor_instance" not in unsupport_list:
+            if not self.unsupport:
                 self.intf_down_list, self.delta_intf, self.percentage_delta_intf = self.__find_interfaces_down()
             return None
         else:
@@ -282,13 +280,17 @@ class InterfaceMonitor:
     def __find_interfaces_down(self) -> tuple:
 
         intf_down_list = []
+        delta_intf = 0
+        percentage_delta_intf = 0
+
         for intf in self.intf_up_list_original:
             if intf not in self.intf_up_list_current:
                 intf_down_list.append(intf)
 
         delta_intf = len(intf_down_list)
-        percentage_delta_intf = (len(intf_down_list) /
-                                 len(self.intf_up_list_original)) * 100
+        if len(self.intf_up_list_original) != 0:
+            percentage_delta_intf = (
+                delta_intf / len(self.intf_up_list_original)) * 100
 
         return (intf_down_list, delta_intf, percentage_delta_intf)
 
@@ -302,17 +304,14 @@ class InterfaceMonitor:
             return False
 
     def diff(self):
+        string = ""
         if hasattr(self, "intf_down_list") and hasattr(self, "delta_intf") and hasattr(self, "percentage_delta_intf"):
-            string = "List of the interfaces changed to down:\n"
+            string = "There are {} ({:.2f}%) interfaces changed to down:\n".format(
+                self.delta_intf, self.percentage_delta_intf)
             if len(self.intf_down_list) > 0:
                 for intf in self.intf_down_list:
                     string = string + "   {}\n".format(intf)
-                return string
-            else:
-                string = string + "   None\n"
-                return string
-        else:
-            return ""
+        return string
 
 
 @decorator_instance
@@ -413,6 +412,7 @@ class FabricpathMonitor:
                     fabricpath_dict["show fabricpath isis interface brief"][interface
                                                                             ]["adjacencies-up"] = output_dict["TABLE_process_tag"]["ROW_process_tag"]["intf-p2p-adj-up-count-out"]
 
+            self.unsupport = False
             return fabricpath_dict
 
         except ConnectionError:
@@ -604,8 +604,7 @@ class VlanMonitor:
                 vlan_dict = dict(vlan_object.info["vlans"])
 
                 return vlan_dict
-            else:
-                return {}
+            self.unsupport = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except ConnectionError:
@@ -613,7 +612,7 @@ class VlanMonitor:
         except:
             self.unsupport = True
             print("Cannot monitor VLANs.")
-            return {}
+        return {}
 
     def original(self):
 
@@ -718,10 +717,10 @@ class FdbMonitor:
                     total_mac_addresses = total_mac_addresses + len(
                         fdb_object.info["mac_table"]["vlans"][key]["mac_addresses"]
                     )
-
-                return total_mac_addresses
-
+                self.unsupport = False
             except:
+                self.unsupport = True
+                print("Cannot monitor MAC address table.")
                 return total_mac_addresses
         except KeyboardInterrupt:
             raise KeyboardInterrupt
@@ -730,7 +729,7 @@ class FdbMonitor:
         except:
             self.unsupport = True
             print("Cannot monitor MAC address table.")
-            return total_mac_addresses
+        return total_mac_addresses
 
     def original(self):
 
@@ -834,7 +833,7 @@ class ArpMonitor:
                         ],
                     ):
                         arp_entries = arp_entries + 1
-
+            self.unsupport = False
         except ConnectionError:
             print("\nThe connection is disconnected. The device may be reloading.")
             raise ConnectionError
@@ -944,6 +943,9 @@ class RoutingMonitor:
                             "routes"
                         ]
                     )
+
+            self.unsupport = False
+
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except ConnectionError:
@@ -1098,6 +1100,7 @@ class OspfMonitor:
 
                                                 ospf_neighbor_list.append(
                                                     neighbor_dict)
+                self.unsupport = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except ConnectionError:
