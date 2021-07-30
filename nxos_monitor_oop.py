@@ -1341,6 +1341,14 @@ class AllDetail:
             return ""
 
 
+def askYesNo(question):
+    answer = input(question)
+    while answer.upper() != "Y" and answer.upper() != "N":
+        print("Your input is invalid. Please enter Y or N.")
+        answer = input(question)
+    return answer
+
+
 def get_testbed() -> tuple:
 
     print()
@@ -1393,13 +1401,8 @@ def get_testbed() -> tuple:
             dir_original_snapshot_import = cfg.dir_original_snapshot
             if not os.path.exists("{}".format(dir_original_snapshot_import)):
                 print("\n{} directory does not exist.".format(dir_output))
-                have_snapshot = input(
+                have_snapshot = askYesNo(
                     "Do you have the original snapshot directory (Y or N): ")
-
-                while have_snapshot.upper() != "Y" and have_snapshot.upper() != "N":
-                    print("Your input is invalid. Please enter Y or N.")
-                    have_snapshot = input(
-                        "Do you have the original snapshot directory (Y or N): ")
                 if have_snapshot.upper() == "Y":
                     dir_original_snapshot_import = input(
                         "Enter the directory original snapshot directory (e.g. /home/script): ")
@@ -1494,16 +1497,11 @@ def get_testbed() -> tuple:
             }
         }
 
-        have_snapshot = input(
+        have_snapshot = askYesNo(
             "Do you have the original snapshot directory (Y or N): ")
-
-        while have_snapshot.upper() != "Y" and have_snapshot.upper() != "N":
-            print("Your input is invalid. Please enter Y or N.")
-            have_snapshot = input(
-                "Do you have the original snapshot directory (Y or N): ")
-        if exit.upper() == "Y":
+        if have_snapshot.upper() == "Y":
             dir_original_snapshot_import = input(
-                "Enter the directory original snapshot directory (e.g. /home/script): ")
+                "Enter the directory of original snapshot (e.g. /home/script): ")
             while not os.path.exists("{}".format(dir_original_snapshot_import)):
                 print("{} directory does not exist.".format(
                     dir_original_snapshot_import))
@@ -1524,6 +1522,7 @@ def get_testbed() -> tuple:
 
     if len(dir_output) > 1 and dir_output[-1] == "/":
         dir_output = dir_output[:-1]
+
     lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
 
     return (testbed_dict, lost_safe_tuple, dir_output)
@@ -1716,39 +1715,21 @@ def main():
         except KeyboardInterrupt:
             print("\nYou have paused the program.\n")
 
-            exit = input("\nDo you want to exit the program? (Y or N)? ")
-
-            while exit.upper() != "Y" and exit.upper() != "N":
-                print("Your input is invalid. Please enter Y or N.")
-                exit = input("\nDo you want to exit the program? (Y or N)? ")
+            exit = askYesNo("\nDo you want to exit the program? (Y or N)? ")
             if exit.upper() == "Y":
                 print("\nThe program has exited.\n")
                 sys.exit()
 
             if is_detail:
-                off_detail_input = input(
-                    "\nDo you want to turn off the mode compare all detail differences (Y or N)? "
-                )
-                while (
-                    off_detail_input.upper() != "Y" and off_detail_input.upper() != "N"
-                ):
-                    print("Your input is invalid. Please enter Y or N.")
-                    off_detail_input = input(
-                        "\nDo you want to turn off the mode compare all detail differences (Y or N)? "
-                    )
+                off_detail_input = askYesNo(
+                    "\nDo you want to turn off the mode compare all detail differences (Y or N)? ")
                 if off_detail_input.upper() == "Y":
                     is_detail = False
                 else:
                     is_detail = True
             else:
-                on_detail_input = input(
-                    "\nDo you want to turn on the mode compare all detail differences (Y or N)? "
-                )
-                while on_detail_input.upper() != "Y" and on_detail_input.upper() != "N":
-                    print("Your input is invalid. Please enter Y or N.")
-                    on_detail_input = input(
-                        "\nDo you want to turn on the mode compare all detail differences (Y or N)? "
-                    )
+                on_detail_input = askYesNo(
+                    "\nDo you want to turn on the mode compare all detail differences (Y or N)? ")
                 if on_detail_input.upper() == "Y":
                     is_detail = True
                 else:
