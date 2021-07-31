@@ -1344,9 +1344,45 @@ class AllDetail:
 def askYesNo(question):
     answer = input(question)
     while answer.upper() != "Y" and answer.upper() != "N":
-        print("Your input is invalid. Please enter Y or N.")
+        print("Invalid answer. Please enter Y or N.")
         answer = input(question)
     return answer
+
+
+def askDirectory(prompt):
+    directory = input(prompt)
+    while not os.path.exists("{}".format(directory)):
+        print("{} directory does not exist.".format(
+            directory))
+        directory = input(prompt)
+    return directory
+
+
+def askIPv4address():
+    regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+    while True:
+        ipv4 = input("Enter the IPv4 address of the device: ")
+        if(re.search(regex, ipv4)):
+            break
+        else:
+            print("Invalid IPv4 address")
+    return ipv4
+
+
+def askNumber(question):
+    while True:
+        number = input(question)
+        try:
+            number = int(number)
+            break
+        except ValueError:
+            try:
+                number = float(number)
+                break
+            except ValueError:
+                print("Invalid number")
+
+    return number
 
 
 def get_testbed() -> tuple:
@@ -1404,13 +1440,9 @@ def get_testbed() -> tuple:
                 have_snapshot = askYesNo(
                     "Do you have the original snapshot directory (Y or N): ")
                 if have_snapshot.upper() == "Y":
-                    dir_original_snapshot_import = input(
+                    dir_original_snapshot_import = askDirectory(
                         "Enter the directory original snapshot directory (e.g. /home/script): ")
-                    while not os.path.exists("{}".format(dir_original_snapshot_import)):
-                        print("{} directory does not exist.".format(
-                            dir_original_snapshot_import))
-                        dir_original_snapshot_import = input(
-                            "Enter the directory original snapshot directory (e.g. /home/script): ")
+
                     print("The program will use {} as the original snapshot".format(
                         dir_original_snapshot_import))
                     have_original_dir = True
@@ -1432,50 +1464,15 @@ def get_testbed() -> tuple:
             )
         )
         hostname = input("Enter the hostname of the device: ")
-        ip = input("Enter the IP address of the device: ")
+        ip = askIPv4address()
         username = input("Enter username: ")
         password = getpass()
-        while True:
-            lost_mac_safe = input(
-                "Enter the percentage lost of insignificant amount of MAC addresses: "
-            )
-            try:
-                lost_mac_safe = int(lost_mac_safe)
-                break
-            except ValueError:
-                try:
-                    lost_mac_safe = float(lost_mac_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
-
-        while True:
-            lost_arp_safe = input(
-                "Enter the percentage lost of insignificant amount of ARP entries: "
-            )
-            try:
-                lost_arp_safe = int(lost_arp_safe)
-                break
-            except ValueError:
-                try:
-                    lost_arp_safe = float(lost_arp_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
-
-        while True:
-            lost_routes_safe = input(
-                "Enter the percentage lost of insignificant amount of routes in routing table: "
-            )
-            try:
-                lost_routes_safe = int(lost_routes_safe)
-                break
-            except ValueError:
-                try:
-                    lost_routes_safe = float(lost_routes_safe)
-                    break
-                except ValueError:
-                    print("You have entered invalid value. Please enter a number.")
+        lost_mac_safe = askNumber(
+            "Enter the percentage lost of insignificant amount of MAC addresses: ")
+        lost_arp_safe = askNumber(
+            "Enter the percentage lost of insignificant amount of ARP entries: ")
+        lost_routes_safe = askNumber(
+            "Enter the percentage lost of insignificant amount of routes in routing table: ")
 
         testbed_dict = {
             "devices": {
@@ -1500,25 +1497,15 @@ def get_testbed() -> tuple:
         have_snapshot = askYesNo(
             "Do you have the original snapshot directory (Y or N): ")
         if have_snapshot.upper() == "Y":
-            dir_original_snapshot_import = input(
+            dir_original_snapshot_import = askDirectory(
                 "Enter the directory of original snapshot (e.g. /home/script): ")
-            while not os.path.exists("{}".format(dir_original_snapshot_import)):
-                print("{} directory does not exist.".format(
-                    dir_original_snapshot_import))
-                dir_original_snapshot_import = input(
-                    "Enter the directory original snapshot directory (e.g. /home/script): ")
             have_original_dir = True
         else:
             print("The program will learn the original snapshot.\n")
             have_original_dir = False
 
-        dir_output = input(
+        dir_output = askDirectory(
             "Enter the directory that will store the output files (e.g. /home/script): ")
-
-        while not os.path.exists("{}".format(dir_output)):
-            print("{} directory does not exist.".format(dir_output))
-            dir_output = input(
-                "Enter the directory that will store the output files (e.g. /home/script): ")
 
     if len(dir_output) > 1 and dir_output[-1] == "/":
         dir_output = dir_output[:-1]
