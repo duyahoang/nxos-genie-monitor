@@ -34,9 +34,6 @@ unsupport_list = []
 lost_mac_safe = 0
 lost_arp_safe = 0
 lost_routes_safe = 0
-have_original_dir = False
-dir_original_snapshot_import = ""
-dir_original_snapshot_create = ""
 
 
 def decorator_instance(class_monitor):
@@ -81,11 +78,13 @@ def comparedict(original_dict, current_dict, key_list):
 
 
 class Device:
-    def __init__(self, testbed_dict) -> None:
+    def __init__(self, testbed_dict, hostname, unsupport_list, lost_safe_tuple) -> None:
         self.testbed_dict = testbed_dict
-        hostname = list(self.testbed_dict["devices"].keys())[0]
+        self.hostname = hostname
+        self.unsupport_list = unsupport_list
+        self.lost_mac_safe, self.lost_arp_safe, self.lost_routes_safe = lost_safe_tuple
         testbed_nxos = testbed.load(self.testbed_dict)
-        self.device = testbed_nxos.devices[hostname]
+        self.device = testbed_nxos.devices[self.hostname]
 
     def make_connection(self):
 
@@ -101,15 +100,19 @@ class Device:
                     22,
                 )
             )
-            self.device.connect(log_stdout=False, prompt_recovery=True)
-            # self.device.connect(log_stdout=False, prompt_recovery=True)
+            self.device.connect(
+                log_stdout=False, prompt_recovery=True, reconnect=True)
             # self.device.connect(via="vty", pool_size=10, log_stdout=False, prompt_recovery=True)
 
 
 @decorator_instance
 class FeatureMonitor:
-    def __init__(self, device) -> None:
+    def __init__(self, device, **kwargs) -> None:
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_feature(self):
@@ -141,16 +144,17 @@ class FeatureMonitor:
         return feature_enabled
 
     def original(self):
-        if not have_original_dir:
+
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
             self.feature_enabled_original = self.learn_feature()
 
-            with open("{}/feature_enabled.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/feature_enabled.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.feature_enabled_original, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/feature_enabled.json".format(dir_original_snapshot_import)):
-                    with open("{}/feature_enabled.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/feature_enabled.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/feature_enabled.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.feature_enabled_original = json.load(f)
                 else:
                     unsupport_list.append("FeatureMonitor_instance")
@@ -170,7 +174,7 @@ class FeatureMonitor:
                 self.feature_changed, self.delta_feature, self.percentage_delta_feature = self.__find_feature_diff()
         else:
             print("The original feature of {} have not been learned yet. Therefore, please learn the original feature before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
 
         return None
 
@@ -213,9 +217,14 @@ class FeatureMonitor:
 @decorator_instance
 class InterfaceMonitor:
 
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_interfaces(self) -> list:
@@ -244,15 +253,15 @@ class InterfaceMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
             self.intf_up_list_original = self.learn_interfaces()
-            with open("{}/interface_up_list.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/interface_up_list.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.intf_up_list_original, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/interface_up_list.json".format(dir_original_snapshot_import)):
-                    with open("{}/interface_up_list.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/interface_up_list.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/interface_up_list.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.intf_up_list_original = json.load(f)
                 else:
                     unsupport_list.append("InterfaceMonitor_instance")
@@ -274,7 +283,7 @@ class InterfaceMonitor:
             return None
         else:
             print("The original interfaces of {} have not been learned yet. Therefore, please learn the original interfaces before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_interfaces_down(self) -> tuple:
@@ -317,8 +326,12 @@ class InterfaceMonitor:
 @decorator_instance
 class FabricpathMonitor:
 
-    def __init__(self, device) -> None:
+    def __init__(self, device, **kwargs) -> None:
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_fabricpath(self):
@@ -422,7 +435,7 @@ class FabricpathMonitor:
             raise KeyboardInterrupt
         except:
             print(
-                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath switch-id.\n".format(
+                "\nCannot parse the command: {}\nThe device may not support this command.\nCannot monitor fabricpath.\n".format(
                     cmd
                 )
             )
@@ -432,16 +445,16 @@ class FabricpathMonitor:
 
     def original(self) -> None:
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
             self.fabricpath_dict_original = self.learn_fabricpath()
-            with open("{}/fabricpath.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/fabricpath.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(
                     self.fabricpath_dict_original, indent=4))
         else:
             try:
-                if os.path.isfile("{}/fabricpath.json".format(dir_original_snapshot_import)):
+                if os.path.isfile("{}/fabricpath.json".format(self.dir_original_snapshot_import)):
 
-                    with open("{}/fabricpath.json".format(dir_original_snapshot_import), 'r') as f:
+                    with open("{}/fabricpath.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.fabricpath_dict_original = json.load(f)
                 else:
 
@@ -465,7 +478,7 @@ class FabricpathMonitor:
         else:
 
             print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_fabricpath_diff(self):
@@ -583,9 +596,12 @@ class FabricpathMonitor:
 @ decorator_instance
 class VlanMonitor:
 
-    def __init__(self, device):
-
+    def __init__(self, device, **kwargs):
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_vlans(self) -> dict:
@@ -616,17 +632,17 @@ class VlanMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
 
             self.vlan_dict_original = self.learn_vlans()
 
-            with open("{}/vlan.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/vlan.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.vlan_dict_original, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/vlan.json".format(dir_original_snapshot_import)):
-                    with open("{}/vlan.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/vlan.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/vlan.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.vlan_dict_original = json.load(f)
                 else:
                     unsupport_list.append("VlanMonitor_instance")
@@ -647,7 +663,7 @@ class VlanMonitor:
             return None
         else:
             print("The original VLANs of {} have not been learned yet. Therefore, please learn the original VLANs before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_vlans_change(self) -> tuple:
@@ -699,9 +715,13 @@ class VlanMonitor:
 @ decorator_instance
 class FdbMonitor:
 
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_fdb(self) -> int:
@@ -733,18 +753,18 @@ class FdbMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
 
             self.total_mac_addresses_original = self.learn_fdb()
             fdb_dict = dict()
             fdb_dict["total_mac_addresses_original"] = self.total_mac_addresses_original
-            with open("{}/fdb.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/fdb.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(fdb_dict, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/fdb.json".format(dir_original_snapshot_import)):
-                    with open("{}/fdb.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/fdb.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/fdb.json".format(self.dir_original_snapshot_import), 'r') as f:
                         fdb_dict = json.load(f)
                         self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
                 else:
@@ -766,7 +786,7 @@ class FdbMonitor:
             return None
         else:
             print("The original FDB - MAC Address table of {} have not been learned yet. Therefore, please learn the original FDB - MAC Address table before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -805,9 +825,13 @@ class FdbMonitor:
 @ decorator_instance
 class ArpMonitor:
 
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_arp(self) -> int:
@@ -851,18 +875,18 @@ class ArpMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
 
             self.arp_entries_original = self.learn_arp()
             arp_dict = dict()
             arp_dict["total_arp_entries_original"] = self.arp_entries_original
-            with open("{}/arp.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/arp.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(arp_dict, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/arp.json".format(dir_original_snapshot_import)):
-                    with open("{}/arp.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/arp.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/arp.json".format(self.dir_original_snapshot_import), 'r') as f:
                         arp_dict = json.load(f)
                         self.arp_entries_original = arp_dict["total_arp_entries_original"]
                 else:
@@ -884,7 +908,7 @@ class ArpMonitor:
             return None
         else:
             print("The original ARP table of {} have not been learned yet. Therefore, please learn the original ARP table before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -923,9 +947,13 @@ class ArpMonitor:
 @ decorator_instance
 class RoutingMonitor:
 
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_routing(self) -> int:
@@ -957,18 +985,18 @@ class RoutingMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
 
             self.num_routes_original = self.learn_routing()
             routing_dict = dict()
             routing_dict["num_routes_original"] = self.num_routes_original
-            with open("{}/routing.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/routing.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(routing_dict, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/routing.json".format(dir_original_snapshot_import)):
-                    with open("{}/routing.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/routing.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/routing.json".format(self.dir_original_snapshot_import), 'r') as f:
                         routing_dict = json.load(f)
                         self.num_routes_original = routing_dict["num_routes_original"]
                 else:
@@ -990,7 +1018,7 @@ class RoutingMonitor:
             return None
         else:
             print("The original Routing table of {} have not been learned yet. Therefore, please learn the original Routing table before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -1029,9 +1057,13 @@ class RoutingMonitor:
 @ decorator_instance
 class OspfMonitor:
 
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
         self.unsupport = False
 
     def learn_ospf(self) -> list:
@@ -1112,15 +1144,15 @@ class OspfMonitor:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
             self.ospf_neighbor_list_original = self.learn_ospf()
-            with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/ospf_neighbors_list.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.ospf_neighbor_list_original, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import)):
-                    with open("{}/ospf_neighbors_list.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/ospf_neighbors_list.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/ospf_neighbors_list.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.ospf_neighbor_list_original = json.load(f)
                 else:
                     unsupport_list.append("OspfMonitor_instance")
@@ -1143,7 +1175,7 @@ class OspfMonitor:
             return None
         else:
             print("The original OSPF of {} have not been learned yet. Therefore, please learn the original OSPF before learning the current.".format(
-                self.device.hostname))
+                self.device.name))
             return None
 
     def __find_ospf_neighbors_change(self) -> tuple:
@@ -1240,9 +1272,13 @@ class OspfMonitor:
 
 
 class AllDetail:
-    def __init__(self, device):
+    def __init__(self, device, **kwargs):
 
         self.device = device
+        self.dir_original_snapshot_import = kwargs.get(
+            "dir_original_snapshot_import", "default")
+        self.dir_original_snapshot_create = kwargs.get(
+            "dir_original_snapshot_create", "default")
 
     def parse_all_cmd(self):
 
@@ -1285,16 +1321,16 @@ class AllDetail:
 
     def original(self):
 
-        if not have_original_dir:
+        if self.dir_original_snapshot_import == "default" and self.dir_original_snapshot_create != "default":
 
             self.all_detail_original, self.exclude = self.parse_all_cmd()
-            with open("{}/all_detail_original.json".format(dir_original_snapshot_create), 'w') as f:
+            with open("{}/all_detail_original.json".format(self.dir_original_snapshot_create), 'w') as f:
                 f.write(json.dumps(self.all_detail_original, indent=4))
 
         else:
             try:
-                if os.path.isfile("{}/interface_up_list.json".format(dir_original_snapshot_import)):
-                    with open("{}/all_detail_original.json".format(dir_original_snapshot_import), 'r') as f:
+                if os.path.isfile("{}/all_detail_original.json".format(self.dir_original_snapshot_import)):
+                    with open("{}/all_detail_original.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.all_detail_original = json.load(f)
                 else:
                     self.all_detail_original, self.exclude = self.parse_all_cmd()
@@ -1304,7 +1340,7 @@ class AllDetail:
     def current(self):
         self.all_detail_current, self.exclude = self.parse_all_cmd()
 
-        if have_original_dir:
+        if not self.dir_original_snapshot_import == "default":
             all_detail_current_json = json.dumps(
                 self.all_detail_current, indent=4)
             self.all_detail_current = json.loads(all_detail_current_json)
@@ -1385,7 +1421,39 @@ def askNumber(question):
     return number
 
 
-def get_testbed() -> tuple:
+def get_testbed(testbed_dir):
+    if os.path.isfile(testbed_dir):
+        with open(testbed_dir, 'r') as f:
+            testbed_dict = json.load(f)
+
+    lost_mac_safe = askNumber(
+        "Enter the percentage lost of insignificant amount of MAC addresses: ")
+    lost_arp_safe = askNumber(
+        "Enter the percentage lost of insignificant amount of ARP entries: ")
+    lost_routes_safe = askNumber(
+        "Enter the percentage lost of insignificant amount of routes in routing table: ")
+    lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
+
+    have_snapshot = askYesNo(
+        "Do you have the original snapshot directory (Y or N): ")
+    if have_snapshot.upper() == "Y":
+        dir_original_snapshot_import = askDirectory(
+            "Enter the directory of original snapshot (e.g. /home/script): ")
+        have_original_dir = True
+    else:
+        print("The program will learn the original snapshot.\n")
+        have_original_dir = False
+
+    dir_output = askDirectory(
+        "Enter the directory that will store the output files (e.g. /home/script): ")
+
+    if len(dir_output) > 1 and dir_output[-1] == "/":
+        dir_output = dir_output[:-1]
+
+    return testbed_dict
+
+
+def get_imported_data() -> tuple:
 
     print()
 
@@ -1401,7 +1469,7 @@ def get_testbed() -> tuple:
         print("Imported databaseconfig.py file successfully.")
 
         input_dict = cfg.input_dict
-
+        hostname = input_dict["hostname"]
         testbed_dict = {
             "devices": {
                 input_dict["hostname"]: {
@@ -1431,8 +1499,8 @@ def get_testbed() -> tuple:
             dir_output = input(
                 "Enter the directory that will store the output files (e.g. /home/script): ")
 
-        global have_original_dir
-        global dir_original_snapshot_import
+        dir_original_snapshot_import = "default"
+
         try:
             dir_original_snapshot_import = cfg.dir_original_snapshot
             if not os.path.exists("{}".format(dir_original_snapshot_import)):
@@ -1445,17 +1513,19 @@ def get_testbed() -> tuple:
 
                     print("The program will use {} as the original snapshot".format(
                         dir_original_snapshot_import))
-                    have_original_dir = True
+
                 else:
-                    print("The program will learn the original snapshot.\n")
-                    have_original_dir = False
+                    dir_original_snapshot_import = "default"
+                    print("The program will learn the original snapshot and save it in {}.\n".format(
+                        dir_output))
+
             else:
                 print("The program will use {} as the original snapshot".format(
                     dir_original_snapshot_import))
-                have_original_dir = True
+
         except AttributeError:
             print("\nThe program did not find the orginal snapshot directory in databaseconfig.py.\nThe program will learn the original snapshot and save it in {}.".format(dir_output))
-            have_original_dir = False
+
     except:
 
         print(
@@ -1494,25 +1564,25 @@ def get_testbed() -> tuple:
             }
         }
 
+        dir_output = askDirectory(
+            "Enter the directory that will store the output files (e.g. /home/script): ")
+
         have_snapshot = askYesNo(
             "Do you have the original snapshot directory (Y or N): ")
         if have_snapshot.upper() == "Y":
             dir_original_snapshot_import = askDirectory(
                 "Enter the directory of original snapshot (e.g. /home/script): ")
-            have_original_dir = True
         else:
-            print("The program will learn the original snapshot.\n")
-            have_original_dir = False
-
-        dir_output = askDirectory(
-            "Enter the directory that will store the output files (e.g. /home/script): ")
+            dir_original_snapshot_import = "default"
+            print("The program will learn the original snapshot and save it in {}.\n".format(
+                dir_output))
 
     if len(dir_output) > 1 and dir_output[-1] == "/":
         dir_output = dir_output[:-1]
 
     lost_safe_tuple = (lost_mac_safe, lost_arp_safe, lost_routes_safe)
 
-    return (testbed_dict, lost_safe_tuple, dir_output)
+    return (testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_snapshot_import)
 
 
 def runThreadPoolExecutor(instance_monitor_dict, method_name):
@@ -1551,41 +1621,67 @@ def prepend_line(file_name, line):
 
 def main():
 
-    testbed_dict, lost_safe_tuple, dir_output = get_testbed()
-
-    device = Device(testbed_dict)
-
-    global unsupport_list, lost_mac_safe, lost_arp_safe, lost_routes_safe, dir_original_snapshot_create
-    lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
+    global unsupport_list
+    
+    testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_snapshot_import = get_imported_data()
+    device = Device(testbed_dict, hostname, unsupport_list, lost_safe_tuple)
 
     try:
         if not device.device.is_connected():
             device.make_connection()
     except ConnectionError:
         print("\nERROR: Can't establish the connection to the {}.".format(
-            device.device.hostname))
+            device.device.name))
         print("Please check the hostname, IP aaddress, username, and password.\n")
         sys.exit()
 
     if device.device.is_connected():
-        print("{} is connected.".format(device.device.hostname))
+        print("{} is connected.".format(device.device.name))
     else:
-        print("{} is not connected.".format(device.device.hostname))
+        print("{} is not connected.".format(device.device.name))
 
-    if os.path.isfile("{}/all_diff_output.txt".format(dir_output)):
-        os.remove("{}/all_diff_output.txt".format(dir_output))
-
-    if os.path.isfile("{}/common_diff_output.txt".format(dir_output)):
-        os.remove("{}/common_diff_output.txt".format(dir_output))
+    currentDateTime = datetime.now().strftime("%Y%m%d-%H%M%S")
+    all_diff_output_file = "{}/all_diff_output_{}.txt".format(
+        dir_output, device.device.name, currentDateTime)
+    if os.path.isfile(all_diff_output_file):
+        os.remove(all_diff_output_file)
+    common_diff_output_file = "{}/{}_common_diff_output_{}.txt".format(
+        dir_output, device.device.name, currentDateTime)
+    if os.path.isfile(common_diff_output_file):
+        os.remove(common_diff_output_file)
 
     # print(class_list)
     instance_monitor_dict = dict()
-    for class_element in class_list:
-        instance = class_element(device.device)
-        key = "{}_instance".format(type(instance).__name__)
-        instance_monitor_dict[key] = instance
-        # print(instance)
 
+    if dir_original_snapshot_import == "default":
+
+        while True:
+            dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(
+                dir_output, device.device.name, currentDateTime)
+            if not os.path.exists(dir_original_snapshot_create):
+                os.makedirs(dir_original_snapshot_create)
+                break
+            currentDateTime = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        for class_element in class_list:
+            instance = class_element(
+                device.device, dir_original_snapshot_create=dir_original_snapshot_create)
+            key = "{}_instance".format(type(instance).__name__)
+            instance_monitor_dict[key] = instance
+            # print(instance)
+        alldetail_instance = AllDetail(
+            device.device, dir_original_snapshot_create=dir_original_snapshot_create)
+
+    else:
+
+        for class_element in class_list:
+            instance = class_element(
+                device.device, dir_original_snapshot_import=dir_original_snapshot_import)
+            key = "{}_instance".format(type(instance).__name__)
+            instance_monitor_dict[key] = instance
+            # print(instance)
+        alldetail_instance = AllDetail(
+            device.device, dir_original_snapshot_import=dir_original_snapshot_import)
     # print(list(instance_monitor_dict.keys()))
 
     have_original = False
@@ -1594,17 +1690,9 @@ def main():
     try:
         if not have_original:
             print("The program is learning {}'s common information for the original state...".format(
-                device.device.hostname))
+                device.device.name))
             now1 = datetime.now()
             # runThreadPoolExecutor(instance_monitor_dict, "original")
-
-            if not have_original_dir:
-                while True:
-                    dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(
-                        dir_output, device.device.hostname, datetime.now().strftime("%Y%m%d-%H%M%S"))
-                    if not os.path.exists(dir_original_snapshot_create):
-                        os.makedirs(dir_original_snapshot_create)
-                        break
 
             for instance in instance_monitor_dict.values():
                 instance.original()
@@ -1617,9 +1705,8 @@ def main():
             )
 
             print("The program is learning {}'s all details for the original state...".format(
-                device.device.hostname))
+                device.device.name))
             now1 = datetime.now()
-            alldetail_instance = AllDetail(device.device)
             alldetail_instance.original()
             now2 = datetime.now()
             print(
@@ -1632,27 +1719,22 @@ def main():
 
     except KeyboardInterrupt:
         print("\nThe program has exited before learning's original state.\n".format(
-            device.device.hostname))
+            device.device.name))
         sys.exit()
 
     except ConnectionError:
         print(
             "\nThe connection to {} has been disconnected before learning original state.\n".format(
-                device.device.hostname)
+                device.device.name)
         )
         sys.exit()
 
-    lost_mac_safe, lost_arp_safe, lost_routes_safe = lost_safe_tuple
     print("The programs is beginning to monitor {}...".format(
-        device.device.hostname))
+        device.device.name))
     while True:
         try:
             if not device.device.is_connected():
                 device.make_connection()
-
-            # print("List of feature that are not supported by {}:".format(
-            #     device.device.hostname))
-            # print(unsupport_list)
 
             for instance_name, instance in instance_monitor_dict.items():
                 if instance_name not in unsupport_list:
@@ -1661,7 +1743,7 @@ def main():
             # if not instance_monitor_dict:
             if len(instance_monitor_dict) == len(set(unsupport_list)):
                 print("\nThe {} device does not support any monitoring category in this tool.\n".format(
-                    device.device.hostname))
+                    device.device.name))
                 sys.exit()
 
             string = ""
@@ -1680,12 +1762,11 @@ def main():
                         string = string + value.diff()
             else:
                 string = string + "{} does not change.\n".format(
-                    device.device.hostname)
+                    device.device.name)
             string = string + "\n{}".format("-"*102)
 
             print(string)
-            prepend_line(
-                "{}/common_diff_output.txt".format(dir_output), string)
+            prepend_line(common_diff_output_file, string)
 
             if is_detail:
                 print("\nThe program is parsing all commands...")
@@ -1696,8 +1777,7 @@ def main():
                         dir_output)
                 )
                 print("{}\n".format("-"*102))
-                prepend_line(
-                    "{}/all_diff_output.txt".format(dir_output), string)
+                prepend_line(all_diff_output_file, string)
 
         except KeyboardInterrupt:
             print("\nYou have paused the program.\n")
