@@ -30,10 +30,6 @@ import json
 
 
 class_list = []
-unsupport_list = []
-lost_mac_safe = 0
-lost_arp_safe = 0
-lost_routes_safe = 0
 
 
 def decorator_instance(class_monitor):
@@ -78,31 +74,31 @@ def comparedict(original_dict, current_dict, key_list):
 
 
 class Device:
-    def __init__(self, testbed_dict, hostname, unsupport_list, lost_safe_tuple) -> None:
+    def __init__(self, testbed_dict, hostname, lost_safe_tuple) -> None:
         self.testbed_dict = testbed_dict
         self.hostname = hostname
-        self.unsupport_list = unsupport_list
+        self.unsupport_list = []
         self.lost_mac_safe, self.lost_arp_safe, self.lost_routes_safe = lost_safe_tuple
         testbed_nxos = testbed.load(self.testbed_dict)
-        self.device = testbed_nxos.devices[self.hostname]
+        self.device_genie = testbed_nxos.devices[self.hostname]
 
     def make_connection(self):
 
-        if not self.device.is_connected():
+        if not self.device_genie.is_connected():
             print(
                 "\nThe program is trying to connect to the host {} {} {} device via line VTY {} port {}.".format(
-                    self.device.name,
-                    self.testbed_dict["devices"][self.device.name]["connections"]["vty"]["ip"],
-                    self.testbed_dict["devices"][self.device.name]["os"].upper(
+                    self.device_genie.name,
+                    self.testbed_dict["devices"][self.device_genie.name]["connections"]["vty"]["ip"],
+                    self.testbed_dict["devices"][self.device_genie.name]["os"].upper(
                     ),
-                    self.testbed_dict["devices"][self.device.name]["connections"]["vty"]["protocol"].upper(
+                    self.testbed_dict["devices"][self.device_genie.name]["connections"]["vty"]["protocol"].upper(
                     ),
                     22,
                 )
             )
-            self.device.connect(
+            self.device_genie.connect(
                 log_stdout=False, prompt_recovery=True, reconnect=True)
-            # self.device.connect(via="vty", pool_size=10, log_stdout=False, prompt_recovery=True)
+            # self.device_genie.connect(via="vty", pool_size=10, log_stdout=False, prompt_recovery=True)
 
 
 @decorator_instance
@@ -119,7 +115,7 @@ class FeatureMonitor:
         feature_enabled = []
         try:
             cmd = "show feature"
-            output = self.device.parse(cmd)
+            output = self.device.device_genie.parse(cmd)
             for key, value in output["feature"].items():
                 for in_value in value["instance"].values():
                     if in_value["state"] == "enabled":
@@ -127,7 +123,7 @@ class FeatureMonitor:
                         break
 
             cmd = "show feature-set"
-            output = self.device.parse(cmd)
+            output = self.device.device_genie.parse(cmd)
             for key, value in output["feature"].items():
                 for in_value in value["instance"].values():
                     if in_value["state"] == "enabled":
@@ -157,14 +153,15 @@ class FeatureMonitor:
                     with open("{}/feature_enabled.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.feature_enabled_original = json.load(f)
                 else:
-                    unsupport_list.append("FeatureMonitor_instance")
+                    self.device.unsupport_list.append(
+                        "FeatureMonitor_instance")
                     return None
             except:
-                unsupport_list.append("FeatureMonitor_instance")
+                self.device.unsupport_list.append("FeatureMonitor_instance")
                 return None
 
         if len(self.feature_enabled_original) == 0:
-            unsupport_list.append("FeatureMonitor_instance")
+            self.device.unsupport_list.append("FeatureMonitor_instance")
             return None
 
     def current(self):
@@ -174,7 +171,7 @@ class FeatureMonitor:
                 self.feature_changed, self.delta_feature, self.percentage_delta_feature = self.__find_feature_diff()
         else:
             print("The original feature of {} have not been learned yet. Therefore, please learn the original feature before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
 
         return None
 
@@ -231,8 +228,8 @@ class InterfaceMonitor:
 
         intf_up_list = []
         try:
-            Interface = get_ops("interface", self.device)
-            interface_object = Interface(device=self.device)
+            Interface = get_ops("interface", self.device.device_genie)
+            interface_object = Interface(device=self.device.device_genie)
             interface_object.learn()
 
             for intf in interface_object.info:
@@ -264,14 +261,15 @@ class InterfaceMonitor:
                     with open("{}/interface_up_list.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.intf_up_list_original = json.load(f)
                 else:
-                    unsupport_list.append("InterfaceMonitor_instance")
+                    self.device.unsupport_list.append(
+                        "InterfaceMonitor_instance")
                     return None
             except:
-                unsupport_list.append("InterfaceMonitor_instance")
+                self.device.unsupport_list.append("InterfaceMonitor_instance")
                 return None
 
         if len(self.intf_up_list_original) == 0:
-            unsupport_list.append("InterfaceMonitor_instance")
+            self.device.unsupport_list.append("InterfaceMonitor_instance")
             return None
 
     def current(self):
@@ -283,7 +281,7 @@ class InterfaceMonitor:
             return None
         else:
             print("The original interfaces of {} have not been learned yet. Therefore, please learn the original interfaces before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_interfaces_down(self) -> tuple:
@@ -340,7 +338,7 @@ class FabricpathMonitor:
 
         try:
             cmd = "show fabricpath switch-id | json"
-            output = self.device.execute(cmd)
+            output = self.device.device_genie.execute(cmd)
             output_dict = json.loads(output)
             fabricpath_dict["show fabricpath switch-id"] = {
                 "list switch-id": []}
@@ -356,7 +354,7 @@ class FabricpathMonitor:
                             output_dict["TABLE_swid"]["ROW_swid"].copy())
 
             cmd = "show fabricpath isis adjacency"
-            output = self.device.parse(cmd)
+            output = self.device.device_genie.parse(cmd)
             if len(output) < 1:
                 fabricpath_dict["show fabricpath isis adjacency"] = "Not support"
             elif len(output["domain"]) < 1:
@@ -369,7 +367,7 @@ class FabricpathMonitor:
                             fabricpath_dict["show fabricpath isis adjacency"][inside_key] = output["domain"][key]["interfaces"][inside_key]
 
             cmd = "show fabricpath isis interface brief | json"
-            output = self.device.execute(cmd)
+            output = self.device.device_genie.execute(cmd)
             output_dict = json.loads(output)
             fabricpath_dict["show fabricpath isis interface brief"] = {}
             if "intf-name-out" in output_dict["TABLE_process_tag"]["ROW_process_tag"].keys():
@@ -458,15 +456,15 @@ class FabricpathMonitor:
                         self.fabricpath_dict_original = json.load(f)
                 else:
 
-                    unsupport_list.append(
+                    self.device.unsupport_list.append(
                         "FabricpathMonitor_instance")
                     return None
             except:
-                unsupport_list.append("FabricpathMonitor_instance")
+                self.device.unsupport_list.append("FabricpathMonitor_instance")
                 return None
 
         if len(self.fabricpath_dict_original) == 0:
-            unsupport_list.append("FabricpathMonitor_instance")
+            self.device.unsupport_list.append("FabricpathMonitor_instance")
             return None
 
     def current(self) -> None:
@@ -478,7 +476,7 @@ class FabricpathMonitor:
         else:
 
             print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_fabricpath_diff(self):
@@ -607,8 +605,8 @@ class VlanMonitor:
     def learn_vlans(self) -> dict:
 
         try:
-            Vlan = get_ops('vlan', self.device)
-            vlan_object = Vlan(device=self.device)
+            Vlan = get_ops('vlan', self.device.device_genie)
+            vlan_object = Vlan(device=self.device.device_genie)
             vlan_object.learn()
 
             if vlan_object.info.get("vlans", None):
@@ -645,14 +643,14 @@ class VlanMonitor:
                     with open("{}/vlan.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.vlan_dict_original = json.load(f)
                 else:
-                    unsupport_list.append("VlanMonitor_instance")
+                    self.device.unsupport_list.append("VlanMonitor_instance")
                     return None
             except:
-                unsupport_list.append("VlanMonitor_instance")
+                self.device.unsupport_list.append("VlanMonitor_instance")
                 return None
 
         if len(self.vlan_dict_original) == 0:
-            unsupport_list.append("VlanMonitor_instance")
+            self.device.unsupport_list.append("VlanMonitor_instance")
             return None
 
     def current(self):
@@ -663,7 +661,7 @@ class VlanMonitor:
             return None
         else:
             print("The original VLANs of {} have not been learned yet. Therefore, please learn the original VLANs before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_vlans_change(self) -> tuple:
@@ -728,8 +726,8 @@ class FdbMonitor:
 
         total_mac_addresses = 0
         try:
-            Fdb = get_ops('fdb', self.device)
-            fdb_object = Fdb(self.device)
+            Fdb = get_ops('fdb', self.device.device_genie)
+            fdb_object = Fdb(self.device.device_genie)
             fdb_object.learn()
 
             try:
@@ -768,14 +766,14 @@ class FdbMonitor:
                         fdb_dict = json.load(f)
                         self.total_mac_addresses_original = fdb_dict["total_mac_addresses_original"]
                 else:
-                    unsupport_list.append("FdbMonitor_instance")
+                    self.device.unsupport_list.append("FdbMonitor_instance")
                     return None
             except:
-                unsupport_list.append("FdbMonitor_instance")
+                self.device.unsupport_list.append("FdbMonitor_instance")
                 return None
 
         if self.total_mac_addresses_original == 0:
-            unsupport_list.append("FdbMonitor_instance")
+            self.device.unsupport_list.append("FdbMonitor_instance")
             return None
 
     def current(self):
@@ -786,7 +784,7 @@ class FdbMonitor:
             return None
         else:
             print("The original FDB - MAC Address table of {} have not been learned yet. Therefore, please learn the original FDB - MAC Address table before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -803,7 +801,7 @@ class FdbMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_mac") and hasattr(self, "percentage_delta_mac"):
-            if self.percentage_delta_mac > lost_mac_safe:
+            if self.percentage_delta_mac > self.device.lost_mac_safe:
                 return True
             else:
                 return False
@@ -840,7 +838,7 @@ class ArpMonitor:
 
         try:
             cmd = "show ip arp detail vrf all"
-            arp_object_output = self.device.parse(cmd)
+            arp_object_output = self.device.device_genie.parse(cmd)
 
             if len(arp_object_output) < 1:
                 return arp_entries
@@ -890,14 +888,14 @@ class ArpMonitor:
                         arp_dict = json.load(f)
                         self.arp_entries_original = arp_dict["total_arp_entries_original"]
                 else:
-                    unsupport_list.append("ArpMonitor_instance")
+                    self.device.unsupport_list.append("ArpMonitor_instance")
                     return None
             except:
-                unsupport_list.append("ArpMonitor_instance")
+                self.device.unsupport_list.append("ArpMonitor_instance")
                 return None
 
         if self.arp_entries_original == 0:
-            unsupport_list.append("ArpMonitor_instance")
+            self.device.unsupport_list.append("ArpMonitor_instance")
             return None
 
     def current(self):
@@ -908,7 +906,7 @@ class ArpMonitor:
             return None
         else:
             print("The original ARP table of {} have not been learned yet. Therefore, please learn the original ARP table before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -925,7 +923,7 @@ class ArpMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_arp") and hasattr(self, "percentage_delta_arp"):
-            if self.percentage_delta_arp > lost_arp_safe:
+            if self.percentage_delta_arp > self.device.lost_arp_safe:
                 return True
             else:
                 return False
@@ -960,8 +958,8 @@ class RoutingMonitor:
 
         num_routes = 0
         try:
-            Routing = get_ops('routing', self.device)
-            routing_object = Routing(device=self.device)
+            Routing = get_ops('routing', self.device.device_genie)
+            routing_object = Routing(device=self.device.device_genie)
             routing_object.learn()
 
             for vrf_key in routing_object.info["vrf"]:
@@ -1000,14 +998,15 @@ class RoutingMonitor:
                         routing_dict = json.load(f)
                         self.num_routes_original = routing_dict["num_routes_original"]
                 else:
-                    unsupport_list.append("RoutingMonitor_instance")
+                    self.device.unsupport_list.append(
+                        "RoutingMonitor_instance")
                     return None
             except:
-                unsupport_list.append("RoutingMonitor_instance")
+                self.device.unsupport_list.append("RoutingMonitor_instance")
                 return None
 
         if self.num_routes_original == 0:
-            unsupport_list.append("RoutingMonitor_instance")
+            self.device.unsupport_list.append("RoutingMonitor_instance")
             return None
 
     def current(self):
@@ -1018,7 +1017,7 @@ class RoutingMonitor:
             return None
         else:
             print("The original Routing table of {} have not been learned yet. Therefore, please learn the original Routing table before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_delta(self) -> tuple:
@@ -1035,7 +1034,7 @@ class RoutingMonitor:
 
     def is_changed(self):
         if hasattr(self, "delta_routes") and hasattr(self, "percentage_delta_routes"):
-            if self.percentage_delta_routes > lost_routes_safe:
+            if self.percentage_delta_routes > self.device.lost_routes_safe:
                 return True
             else:
                 return False
@@ -1070,8 +1069,8 @@ class OspfMonitor:
 
         ospf_neighbor_list = []
         try:
-            Ospf = get_ops('ospf', self.device)
-            ospf_object = Ospf(device=self.device)
+            Ospf = get_ops('ospf', self.device.device_genie)
+            ospf_object = Ospf(device=self.device.device_genie)
             ospf_object.learn()
             if ospf_object.info["feature_ospf"] == True and ospf_object.info.get("vrf", None):
                 for vrf in list(ospf_object.info["vrf"].keys()):
@@ -1155,14 +1154,14 @@ class OspfMonitor:
                     with open("{}/ospf_neighbors_list.json".format(self.dir_original_snapshot_import), 'r') as f:
                         self.ospf_neighbor_list_original = json.load(f)
                 else:
-                    unsupport_list.append("OspfMonitor_instance")
+                    self.device.unsupport_list.append("OspfMonitor_instance")
                     return None
             except:
-                unsupport_list.append("OspfMonitor_instance")
+                self.device.unsupport_list.append("OspfMonitor_instance")
                 return None
 
         if len(self.ospf_neighbor_list_original) == 0:
-            unsupport_list.append("OspfMonitor_instance")
+            self.device.unsupport_list.append("OspfMonitor_instance")
             return None
 
     def current(self):
@@ -1175,7 +1174,7 @@ class OspfMonitor:
             return None
         else:
             print("The original OSPF of {} have not been learned yet. Therefore, please learn the original OSPF before learning the current.".format(
-                self.device.name))
+                self.device.device_genie.name))
             return None
 
     def __find_ospf_neighbors_change(self) -> tuple:
@@ -1285,7 +1284,7 @@ class AllDetail:
         cmd_list = []
         cmd_error_list = []
 
-        output = self.device.parse("all")
+        output = self.device.device_genie.parse("all")
 
         for cmd in output:
             if "errored" in output[cmd].keys():
@@ -1297,9 +1296,11 @@ class AllDetail:
 
         for i in range(len(cmd_list)):
             if i == 0:
-                exclude = get_parser_exclude(cmd_list[i], self.device)
+                exclude = get_parser_exclude(
+                    cmd_list[i], self.device.device_genie)
             else:
-                exclude.extend(get_parser_exclude(cmd_list[i], self.device))
+                exclude.extend(get_parser_exclude(
+                    cmd_list[i], self.device.device_genie))
 
         exclude.extend(
             [
@@ -1621,13 +1622,11 @@ def prepend_line(file_name, line):
 
 def main():
 
-    global unsupport_list
-    
     testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_snapshot_import = get_imported_data()
-    device = Device(testbed_dict, hostname, unsupport_list, lost_safe_tuple)
+    device = Device(testbed_dict, hostname, lost_safe_tuple)
 
     try:
-        if not device.device.is_connected():
+        if not device.device_genie.is_connected():
             device.make_connection()
     except ConnectionError:
         print("\nERROR: Can't establish the connection to the {}.".format(
@@ -1635,18 +1634,18 @@ def main():
         print("Please check the hostname, IP aaddress, username, and password.\n")
         sys.exit()
 
-    if device.device.is_connected():
-        print("{} is connected.".format(device.device.name))
+    if device.device_genie.is_connected():
+        print("{} is connected.".format(device.device_genie.name))
     else:
-        print("{} is not connected.".format(device.device.name))
+        print("{} is not connected.".format(device.device_genie.name))
 
     currentDateTime = datetime.now().strftime("%Y%m%d-%H%M%S")
     all_diff_output_file = "{}/all_diff_output_{}.txt".format(
-        dir_output, device.device.name, currentDateTime)
+        dir_output, device.device_genie.name, currentDateTime)
     if os.path.isfile(all_diff_output_file):
         os.remove(all_diff_output_file)
     common_diff_output_file = "{}/{}_common_diff_output_{}.txt".format(
-        dir_output, device.device.name, currentDateTime)
+        dir_output, device.device_genie.name, currentDateTime)
     if os.path.isfile(common_diff_output_file):
         os.remove(common_diff_output_file)
 
@@ -1657,7 +1656,7 @@ def main():
 
         while True:
             dir_original_snapshot_create = "{}/{}_original_snapshot_{}".format(
-                dir_output, device.device.name, currentDateTime)
+                dir_output, device.device_genie.name, currentDateTime)
             if not os.path.exists(dir_original_snapshot_create):
                 os.makedirs(dir_original_snapshot_create)
                 break
@@ -1665,23 +1664,23 @@ def main():
 
         for class_element in class_list:
             instance = class_element(
-                device.device, dir_original_snapshot_create=dir_original_snapshot_create)
+                device, dir_original_snapshot_create=dir_original_snapshot_create)
             key = "{}_instance".format(type(instance).__name__)
             instance_monitor_dict[key] = instance
             # print(instance)
         alldetail_instance = AllDetail(
-            device.device, dir_original_snapshot_create=dir_original_snapshot_create)
+            device, dir_original_snapshot_create=dir_original_snapshot_create)
 
     else:
 
         for class_element in class_list:
             instance = class_element(
-                device.device, dir_original_snapshot_import=dir_original_snapshot_import)
+                device, dir_original_snapshot_import=dir_original_snapshot_import)
             key = "{}_instance".format(type(instance).__name__)
             instance_monitor_dict[key] = instance
             # print(instance)
         alldetail_instance = AllDetail(
-            device.device, dir_original_snapshot_import=dir_original_snapshot_import)
+            device, dir_original_snapshot_import=dir_original_snapshot_import)
     # print(list(instance_monitor_dict.keys()))
 
     have_original = False
@@ -1690,7 +1689,7 @@ def main():
     try:
         if not have_original:
             print("The program is learning {}'s common information for the original state...".format(
-                device.device.name))
+                device.device_genie.name))
             now1 = datetime.now()
             # runThreadPoolExecutor(instance_monitor_dict, "original")
 
@@ -1705,7 +1704,7 @@ def main():
             )
 
             print("The program is learning {}'s all details for the original state...".format(
-                device.device.name))
+                device.device_genie.name))
             now1 = datetime.now()
             alldetail_instance.original()
             now2 = datetime.now()
@@ -1719,31 +1718,31 @@ def main():
 
     except KeyboardInterrupt:
         print("\nThe program has exited before learning's original state.\n".format(
-            device.device.name))
+            device.device_genie.name))
         sys.exit()
 
     except ConnectionError:
         print(
             "\nThe connection to {} has been disconnected before learning original state.\n".format(
-                device.device.name)
+                device.device_genie.name)
         )
         sys.exit()
 
     print("The programs is beginning to monitor {}...".format(
-        device.device.name))
+        device.device_genie.name))
     while True:
         try:
-            if not device.device.is_connected():
+            if not device.device_genie.is_connected():
                 device.make_connection()
 
             for instance_name, instance in instance_monitor_dict.items():
-                if instance_name not in unsupport_list:
+                if instance_name not in device.unsupport_list:
                     instance.current()
 
             # if not instance_monitor_dict:
-            if len(instance_monitor_dict) == len(set(unsupport_list)):
+            if len(instance_monitor_dict) == len(set(device.unsupport_list)):
                 print("\nThe {} device does not support any monitoring category in this tool.\n".format(
-                    device.device.name))
+                    device.device_genie.name))
                 sys.exit()
 
             string = ""
@@ -1762,7 +1761,7 @@ def main():
                         string = string + value.diff()
             else:
                 string = string + "{} does not change.\n".format(
-                    device.device.name)
+                    device.device_genie.name)
             string = string + "\n{}".format("-"*102)
 
             print(string)
@@ -1809,21 +1808,21 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
+    # try:
 
-        # Uncomment six lines below to import and decorate classes from extra.py
-        # import inspect
-        # import extra
-        # extra_class_list = [m[1] for m in inspect.getmembers(
-        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-        # for extraClass in extra_class_list:
-        #     extraClass = decorator_instance(extraClass)
+    # Uncomment six lines below to import and decorate classes from extra.py
+    # import inspect
+    # import extra
+    # extra_class_list = [m[1] for m in inspect.getmembers(
+    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+    # for extraClass in extra_class_list:
+    #     extraClass = decorator_instance(extraClass)
 
-        main()
+    main()
 
-    except SystemExit:
-        sys.exit()
-    except:
-        print("\nSomethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    # except SystemExit:
+    #     sys.exit()
+    # except:
+    #     print("\nSomethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
