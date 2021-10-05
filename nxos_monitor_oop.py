@@ -1621,8 +1621,13 @@ def prepend_line(file_name, line):
 
 
 def main():
-
     testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_snapshot_import = get_imported_data()
+    monitor(testbed_dict, hostname, lost_safe_tuple,
+            dir_output, dir_original_snapshot_import)
+
+
+def monitor(testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_snapshot_import):
+
     device = Device(testbed_dict, hostname, lost_safe_tuple)
 
     try:
@@ -1808,21 +1813,21 @@ def main():
 
 
 if __name__ == '__main__':
-    # try:
+    try:
 
-    # Uncomment six lines below to import and decorate classes from extra.py
-    # import inspect
-    # import extra
-    # extra_class_list = [m[1] for m in inspect.getmembers(
-    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-    # for extraClass in extra_class_list:
-    #     extraClass = decorator_instance(extraClass)
+        # Uncomment six lines below to import and decorate classes from extra.py
+        # import inspect
+        # import extra
+        # extra_class_list = [m[1] for m in inspect.getmembers(
+        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+        # for extraClass in extra_class_list:
+        #     extraClass = decorator_instance(extraClass)
 
-    main()
+        main()
 
-    # except SystemExit:
-    #     sys.exit()
-    # except:
-    #     print("\nSomethings went wrong.")
-    #     print("Unexpected error:", sys.exc_info()[0])
-    #     sys.exit()
+    except SystemExit:
+        sys.exit()
+    except:
+        print("\nSomethings went wrong.")
+        print("Unexpected error:", sys.exc_info()[0])
+        sys.exit()
