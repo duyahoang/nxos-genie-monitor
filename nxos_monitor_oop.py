@@ -1623,7 +1623,7 @@ def monitor(testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_sn
             device.make_connection()
     except ConnectionError:
         print("\nERROR: Can't establish the connection to the {}.".format(
-            device.device.name))
+            device.hostname))
         print("Please check the hostname, IP aaddress, username, and password.\n")
         sys.exit()
 
@@ -1801,27 +1801,27 @@ def monitor(testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_sn
                     is_detail = False
 
         except ConnectionError:
-            print("\nThe connection is disconnected. The device may be reloading.")
-            print("The program will try to re-connect after 30 seconds.\n")
+            print(
+                "\nThe connection is disconnected. The program will try to re-connect after 30 seconds.\n")
             sleep(30)
 
 
 if __name__ == '__main__':
-    try:
+    # try:
 
-        # Uncomment six lines below to import and decorate classes from extra.py
-        # import inspect
-        # import extra
-        # extra_class_list = [m[1] for m in inspect.getmembers(
-        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-        # for extraClass in extra_class_list:
-        #     extraClass = decorator_instance(extraClass)
+    # Uncomment six lines below to import and decorate classes from extra.py
+    # import inspect
+    # import extra
+    # extra_class_list = [m[1] for m in inspect.getmembers(
+    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+    # for extraClass in extra_class_list:
+    #     extraClass = decorator_instance(extraClass)
 
-        main()
+    main()
 
-    except SystemExit:
-        sys.exit()
-    except:
-        print("\nSomethings went wrong.")
-        print("Unexpected error:", sys.exc_info()[0])
-        sys.exit()
+    # except SystemExit:
+    #     sys.exit()
+    # except:
+    #     print("\nSomethings went wrong.")
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     sys.exit()
