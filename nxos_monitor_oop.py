@@ -593,7 +593,7 @@ class VlanMonitor:
             Vlan = get_ops('vlan', self.device.device_genie)
             vlan_object = Vlan(device=self.device.device_genie)
             vlan_object.learn()
-
+            vlan_dict = {}
             if vlan_object.info.get("vlans", None):
                 vlan_object.info["vlans"].pop("interface_vlan_enabled", None)
                 vlan_object.info["vlans"].pop(
@@ -601,8 +601,11 @@ class VlanMonitor:
                 vlan_object.info["vlans"].pop("configuration", None)
 
                 vlan_dict = dict(vlan_object.info["vlans"])
-
+                if len(vlan_dict) == 0:
+                    print("There are 0 VLAN. Cannot monitor VLAN.")
+                    self.unsupport = False
                 return vlan_dict
+
             self.unsupport = False
         except KeyboardInterrupt:
             raise KeyboardInterrupt
@@ -844,6 +847,10 @@ class ArpMonitor:
                     cmd
                 )
             )
+            self.unsupport = True
+
+        if arp_entries == 0:
+            print("There are 0 ARP. Cannot monitor ARP.")
             self.unsupport = True
 
         return arp_entries
@@ -1129,6 +1136,7 @@ class OspfMonitor:
                 return None
 
         if len(self.ospf_neighbor_list_original) == 0:
+            print("There are 0 OSPF neighbors. Cannot monitor OSPF neighbors.")
             self.device.unsupport_list.append("OspfMonitor_instance")
             return None
 
@@ -1724,9 +1732,10 @@ def monitor(testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_sn
     print("The programs is beginning to monitor {}...".format(
         device.device_genie.name))
 
-    print("Cannot monitor these features:")
-    for item in device.unsupport_list:
-        print("   {}".format(item))
+    print("Monitor these features:")
+    for key in instance_monitor_dict.keys():
+        if key not in device.unsupport_list:
+            print("   {}".format(key))
 
     while True:
         print(device.unsupport_list)
@@ -1807,21 +1816,21 @@ def monitor(testbed_dict, hostname, lost_safe_tuple, dir_output, dir_original_sn
 
 
 if __name__ == '__main__':
-    # try:
+    try:
 
-    # Uncomment six lines below to import and decorate classes from extra.py
-    # import inspect
-    # import extra
-    # extra_class_list = [m[1] for m in inspect.getmembers(
-    #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
-    # for extraClass in extra_class_list:
-    #     extraClass = decorator_instance(extraClass)
+        # Uncomment six lines below to import and decorate classes from extra.py
+        # import inspect
+        # import extra
+        # extra_class_list = [m[1] for m in inspect.getmembers(
+        #     extra, inspect.isclass) if m[1].__module__ == extra.__name__]
+        # for extraClass in extra_class_list:
+        #     extraClass = decorator_instance(extraClass)
 
-    main()
+        main()
 
-    # except SystemExit:
-    #     sys.exit()
-    # except:
-    #     print("\nSomethings went wrong.")
-    #     print("Unexpected error:", sys.exc_info()[0])
-    #     sys.exit()
+    except SystemExit:
+        sys.exit()
+    except:
+        print("\nSomethings went wrong.")
+        print("Unexpected error:", sys.exc_info()[0])
+        sys.exit()
