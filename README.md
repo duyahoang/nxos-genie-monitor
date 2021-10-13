@@ -30,7 +30,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-The tool utilizes the PyATS/Genie from Cisco to take a snapshot of the original operational state of the Nexus device, including common information(interfaces, VLAN, MAC address, ARP, routing table, and OSPF neighbors) and parsing all show commands that the pyATS/Genie library supports. 
+The tool utilizes the PyATS/Genie from Cisco to take a snapshot of the original operational state of the Nexus device, including common information (interfaces, VLAN, MAC address, etc.) and parsing all show commands that the pyATS/Genie library supports. 
 Then, the tool runs an infinity loop to capture the device's current state and compare it with the original state to find the differences.
 
 The tool supports two modes. The first mode (default) only compares the common information, and the second mode compares all show commands in the current state and original state.
@@ -55,8 +55,6 @@ The tool supports monitor these features:
 To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
-
-This is an example of how to list things you need to use the software and how to install them.
 * Python 3.6 and above
 * pip
   ```sh
@@ -74,16 +72,13 @@ This is an example of how to list things you need to use the software and how to
    git clone https://github.com/duyahoang/nxos-genie-monitor.git
    ```
 
-
-
-
 <!-- USAGE EXAMPLES -->
 ## Usage
 
 * Edit the databaseconfig.py file to add device's information such as hostname, IP address, username, password, and the directory that will store the output files.
 * Run the nxos_monitor_oop.py script. The script will take the input from the databaseconfig.py file. If the file does not exist, the tool will ask for the input.
 * Now, the tool will capture the original state of the device and monitor after that.
-* Using Ctrl-C to pause the program to change the mode(only common or all details) or exit the program.
+* Using Ctrl-C to pause the program to change the mode (only common or all details) or exit the program.
 * The tool can be easily extended the capability. The developer only need to create a new class with constructor, original, current, is_changed, and diff methods to add a new common information.
 
 
