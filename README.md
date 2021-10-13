@@ -38,6 +38,15 @@ Using Ctrl-C to pause the program to change the mode or exit the program.
 
 The tool prints the difference in the common information and also stores it in common_diff_output.txt. The difference of all details shows common is stored in all_diff_output.txt.
 
+The tool supports monitor these features:
+* Features
+* Interface Operation State
+* Number of MAC addresses in MAC address-table
+* Number of ARP entries
+* VLAN database
+* Number of routes in routing table
+* OSPF Neighbors
+* Fabricpath
 
 
 <!-- GETTING STARTED -->
@@ -56,14 +65,15 @@ This is an example of how to list things you need to use the software and how to
 
 ### Installation
 
-1. Clone the repo
-   ```sh
-   git clone https://github.com/duyahoang/nxos-genie-monitor.git
-   ```
-2. Install PyATS/Genie packages
+1. Install PyATS/Genie packages
    ```sh
    pip install pyats[library]
    ```
+2. Clone the repo
+   ```sh
+   git clone https://github.com/duyahoang/nxos-genie-monitor.git
+   ```
+
 
 
 
