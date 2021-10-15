@@ -55,14 +55,25 @@ def comparedict(original_dict, current_dict, key_list):
             for in_key, in_value in original_dict[key].items():
                 if in_key not in key_list:
                     continue
-                else:
-                    if in_value != current_dict[key][in_key]:
-                        value_dict = {in_key: {}}
-                        value_dict[in_key]["original"] = original_dict[key][in_key]
-                        value_dict[in_key]["current"] = current_dict[key][in_key]
+                elif in_key not in current_dict[key].keys():
+                    value_dict = {in_key: {}}
+                    value_dict[in_key]["original"] = original_dict[key][in_key]
+                    value_dict[in_key]["current"] = "Not found in current state"
+                    if key not in diff_dict["Changed values"].keys():
                         diff_dict["Changed values"][key] = value_dict
+                    else:
+                        diff_dict["Changed values"][key].update(value_dict)
 
-                        diff_dict["Changed delta"] = diff_dict["Changed delta"] + 1
+                elif in_key in current_dict[key].keys() and (in_value != current_dict[key][in_key]):
+                    value_dict = {in_key: {}}
+                    value_dict[in_key]["original"] = original_dict[key][in_key]
+                    value_dict[in_key]["current"] = current_dict[key][in_key]
+                    if key not in diff_dict["Changed values"].keys():
+                        diff_dict["Changed values"][key] = value_dict
+                    else:
+                        diff_dict["Changed values"][key].update(value_dict)
+
+    diff_dict["Changed delta"] = len(diff_dict["Changed values"].keys())
 
     diff_dict["Total delta"] = diff_dict["Missing delta"] + \
         diff_dict["Changed delta"]
@@ -168,7 +179,7 @@ class FeatureMonitor:
             if not self.unsupport:
                 self.feature_changed, self.delta_feature, self.percentage_delta_feature = self.__find_feature_diff()
         else:
-            print("The original feature of {} have not been learned yet. Therefore, please learn the original feature before learning the current.".format(
+            print("The original feature of {} have not been learned yet.".format(
                 self.device.device_genie.name))
 
         return None
@@ -199,7 +210,8 @@ class FeatureMonitor:
     def diff(self):
         string = ""
         if hasattr(self, "feature_changed") and hasattr(self, "delta_feature") and hasattr(self, "percentage_delta_feature"):
-            string = "List of the feature changed to disabled:\n"
+            string = "{} ({:.2f}%) features changed to disabled:\n".format(
+                self.delta_feature, self.percentage_delta_feature)
             if self.delta_feature > 0:
                 for feature in self.feature_changed:
                     string = string + "   {}\n".format(feature)
@@ -273,7 +285,7 @@ class InterfaceMonitor:
                 self.intf_down_list, self.delta_intf, self.percentage_delta_intf = self.__find_interfaces_down()
             return None
         else:
-            print("The original interfaces of {} have not been learned yet. Therefore, please learn the original interfaces before learning the current.".format(
+            print("The original interfaces of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -306,7 +318,7 @@ class InterfaceMonitor:
     def diff(self):
         string = ""
         if hasattr(self, "intf_down_list") and hasattr(self, "delta_intf") and hasattr(self, "percentage_delta_intf"):
-            string = "There are {} ({:.2f}%) interfaces changed to down:\n".format(
+            string = "{} ({:.2f}%) interfaces changed to down:\n".format(
                 self.delta_intf, self.percentage_delta_intf)
             if len(self.intf_down_list) > 0:
                 for intf in self.intf_down_list:
@@ -464,7 +476,7 @@ class FabricpathMonitor:
             return None
         else:
 
-            print("The original fabricpath of {} have not been learned yet. Therefore, please learn the original fabricpath before learning the current.".format(
+            print("The original fabricpath of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -546,10 +558,10 @@ class FabricpathMonitor:
     def diff(self) -> str:
         if hasattr(self, "fabricpath_diff_dict"):
 
-            string = "There are {} switch-id lost in the fabricpath.\n".format(
+            string = "{} switch-id lost in the fabricpath.\n".format(
                 self.fabricpath_diff_dict["num_switchid_lost"])
 
-            string = string + "There are {} ({:.2f}%) fabricpath interface have been changed.\n".format(
+            string = string + "{} ({:.2f}%) fabricpath interface have been changed.\n".format(
                 self.fabricpath_diff_dict["delta_fabricpath_interface"], self.fabricpath_diff_dict["percentage_delta_fabricpath_interface"])
             if self.fabricpath_diff_dict["delta_fabricpath_interface"] > 0:
                 for key, value in self.fabricpath_diff_dict["Interfaces lost"].items():
@@ -563,7 +575,7 @@ class FabricpathMonitor:
             if self.fabricpath_diff_dict["Adjacencies lost"] == "Not support":
                 pass
             else:
-                string = string + "There are {} ({:.2f}%) fabricpath adjacency have been changed.\n".format(
+                string = string + "{} ({:.2f}%) fabricpath adjacency have been changed.\n".format(
                     self.fabricpath_diff_dict["delta_fabricpath_adjacency"], self.fabricpath_diff_dict["percentage_delta_fabricpath_adjacency"])
                 if self.fabricpath_diff_dict["delta_fabricpath_adjacency"] > 0:
                     for key, value in self.fabricpath_diff_dict["Adjacencies lost"].items():
@@ -648,16 +660,16 @@ class VlanMonitor:
                 self.vlan_changed_dict, self.delta_vlan, self.percentage_delta_vlan = self.__find_vlans_change()
             return None
         else:
-            print("The original VLANs of {} have not been learned yet. Therefore, please learn the original VLANs before learning the current.".format(
+            print("The original VLANs of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
     def __find_vlans_change(self) -> tuple:
 
         vlan_changed_dict = {}
-        vlan_exculde = ["state"]
+        vlan_keys = ["state"]
         result = comparedict(
-            self.vlan_dict_original, self.vlan_dict_current, vlan_exculde)
+            self.vlan_dict_original, self.vlan_dict_current, vlan_keys)
         if result["Missing delta"] > 0:
             for key, value in result["Missing keys"].items():
                 vlan_changed_dict[key] = {}
@@ -687,7 +699,7 @@ class VlanMonitor:
     def diff(self):
         string = ""
         if hasattr(self, "vlan_changed_dict") and hasattr(self, "delta_vlan") and hasattr(self, "percentage_delta_vlan"):
-            string = "There are {} ({:.2f}%) vlans changed to down:\n".format(
+            string = "{} ({:.2f}%) vlans changed to down:\n".format(
                 self.delta_vlan, self.percentage_delta_vlan)
             for key, value in self.vlan_changed_dict.items():
                 string = string + "   VLAN {}\n".format(key)
@@ -767,7 +779,7 @@ class FdbMonitor:
                 self.delta_mac, self.percentage_delta_mac = self.__find_delta()
             return None
         else:
-            print("The original FDB - MAC Address table of {} have not been learned yet. Therefore, please learn the original FDB - MAC Address table before learning the current.".format(
+            print("The original FDB - MAC Address table of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -795,7 +807,7 @@ class FdbMonitor:
     def diff(self):
         if hasattr(self, "delta_mac") and hasattr(self, "percentage_delta_mac"):
 
-            string = "There are {} ({:.2f}%) MAC addresses is lost.".format(
+            string = "{} ({:.2f}%) MAC addresses is lost.".format(
                 self.delta_mac, self.percentage_delta_mac
             )
             string = string + "\n"
@@ -889,7 +901,7 @@ class ArpMonitor:
                 self.delta_arp, self.percentage_delta_arp = self.__find_delta()
             return None
         else:
-            print("The original ARP table of {} have not been learned yet. Therefore, please learn the original ARP table before learning the current.".format(
+            print("The original ARP table of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -917,7 +929,7 @@ class ArpMonitor:
     def diff(self):
         if hasattr(self, "delta_arp") and hasattr(self, "percentage_delta_arp"):
 
-            string = "There are {} ({:.2f}%) ARP entries is lost.".format(
+            string = "{} ({:.2f}%) ARP entries is lost.".format(
                 self.delta_arp, self.percentage_delta_arp
             )
             string = string + "\n"
@@ -995,7 +1007,7 @@ class RoutingMonitor:
                 self.delta_routes, self.percentage_delta_routes = self.__find_delta()
             return None
         else:
-            print("The original Routing table of {} have not been learned yet. Therefore, please learn the original Routing table before learning the current.".format(
+            print("The original Routing table of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -1023,7 +1035,7 @@ class RoutingMonitor:
     def diff(self):
         if hasattr(self, "delta_routes") and hasattr(self, "percentage_delta_routes"):
 
-            string = "There are {} ({:.2f}%) routes is lost.".format(
+            string = "{} ({:.2f}%) routes is lost.".format(
                 self.delta_routes, self.percentage_delta_routes
             )
             string = string + "\n"
@@ -1149,7 +1161,7 @@ class OspfMonitor:
                 self.neighbor_change_list, self.delta_ospf, self.percentage_delta_ospf = self.__find_ospf_neighbors_change()
             return None
         else:
-            print("The original OSPF of {} have not been learned yet. Therefore, please learn the original OSPF before learning the current.".format(
+            print("The original OSPF of {} have not been learned yet.".format(
                 self.device.device_genie.name))
             return None
 
@@ -1230,7 +1242,7 @@ class OspfMonitor:
 
     def diff(self):
         if hasattr(self, "neighbor_change_list") and hasattr(self, "delta_ospf") and hasattr(self, "percentage_delta_ospf"):
-            string = "\nThere are {} OSPF neighbors' state have been changed:\n".format(
+            string = "\n{} OSPF neighbors' state have been changed:\n".format(
                 self.delta_ospf)
             if len(self.neighbor_change_list) > 0:
                 for neighbor_dict in self.neighbor_change_list:
@@ -1244,6 +1256,171 @@ class OspfMonitor:
                 return string
         else:
             return ""
+
+
+@ decorator_instance
+class HsrpMonitor:
+    def __init__(self, device):
+
+        self.device = device
+        self.unsupport = False
+
+    def learn_hsrp(self) -> dict:
+
+        hsrp_dict = {}
+        try:
+            Hsrp = get_ops("hsrp", self.device.device_genie)
+            hsrp_object = Hsrp(device=self.device.device_genie)
+            # , attributes=['name[(.*)][address_family][(.*)][version][(.*)][groups][(.*)][active_ip_address|active_ipv6_address|active_mac_address]'])
+            hsrp_keys = ["active_ip_address", "active_ipv6_address", "active_mac_address", "active_router",
+                         "standby_ip_address", "standby_ipv6_address", "standby_mac_address", "standby_router", "hsrp_router_state"]
+
+            hsrp_object.learn()
+            if hsrp_object.info["enabled"] == False:
+                self.unsupport = True
+            hsrp_object.info.pop("enabled", None)
+            hsrp_object.info.pop("logging", None)
+            for intf in hsrp_object.info:
+                for addrFamily in hsrp_object.info[intf]["address_family"]:
+                    for version in hsrp_object.info[intf]["address_family"][addrFamily]["version"]:
+                        for group in hsrp_object.info[intf]["address_family"][addrFamily]["version"][version]["groups"]:
+
+                            for key in hsrp_object.info[intf]["address_family"][addrFamily]["version"][version]["groups"][group]:
+                                if key not in hsrp_keys:
+                                    hsrp_object.info[intf]["address_family"][addrFamily]["version"][version]["groups"][group].pop(
+                                        key, None)
+
+                hsrp_dict[intf] = hsrp_object.info[intf].copy()
+
+            self.unsupport = False
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except ConnectionError:
+            raise ConnectionError
+        except:
+            self.unsupport = True
+            print("Cannot monitor HSRP.")
+        return hsrp_dict
+
+    def original(self):
+
+        if self.device.dir_original_snapshot_import == "default" and self.device.dir_original_snapshot_create != "default":
+            self.hsrp_dict_original = self.learn_hsrp()
+            with open("{}/hsrp.json".format(self.device.dir_original_snapshot_create), 'w') as f:
+                f.write(json.dumps(self.hsrp_dict_original, indent=4))
+
+        else:
+            try:
+                if os.path.isfile("{}/hsrp.json".format(self.device.dir_original_snapshot_import)):
+                    with open("{}/hsrp.json".format(self.device.dir_original_snapshot_import), 'r') as f:
+                        self.hsrp_dict_original = json.load(f)
+                else:
+                    self.device.unsupport_list.append(
+                        "HsrpMonitor_instance")
+                    return None
+            except:
+                self.device.unsupport_list.append("HsrpMonitor_instance")
+                return None
+
+        if len(self.hsrp_dict_original) == 0:
+            self.device.unsupport_list.append("HsrpMonitor_instance")
+            return None
+
+    def current(self):
+
+        if hasattr(self, "hsrp_dict_original"):
+            self.hsrp_dict_current = self.learn_hsrp()
+            if not self.unsupport:
+                self.hsrp_changed_dict, self.delta_hsrp, self.percentage_delta_hsrp = self.__find_hsrp_diff()
+            return None
+        else:
+            print("The original HSRP of {} have not been learned yet.".format(
+                self.device.device_genie.name))
+            return None
+
+    def __find_hsrp_diff(self) -> tuple:
+
+        hsrp_changed_dict = {}
+
+        hsrp_keys = ["active_ip_address", "active_ipv6_address", "active_mac_address", "active_router",
+                     "standby_ip_address", "standby_ipv6_address", "standby_mac_address", "standby_router", "hsrp_router_state"]
+        for intf in self.hsrp_dict_original:
+
+            hsrp_changed_dict[intf] = {"Missing": [],
+                                       "Changed": []}
+            if intf not in self.hsrp_dict_current:
+                hsrp_changed_dict[intf]["Missing"].append(
+                    "Not found in current state")
+                continue
+
+            for addrFamily in self.hsrp_dict_original[intf]["address_family"]:
+                for version in self.hsrp_dict_original[intf]["address_family"][addrFamily]["version"]:
+                    try:
+                        group_diff = comparedict(self.hsrp_dict_original[intf]["address_family"][addrFamily]["version"][version]["groups"],
+                                                 self.hsrp_dict_current[intf]["address_family"][addrFamily]["version"][version]["groups"], hsrp_keys)
+
+                        if group_diff["Missing delta"] > 0:
+                            for key in group_diff["Missing keys"]:
+                                hsrp_changed_dict[intf]["Missing"].append(key)
+
+                        if group_diff["Changed delta"] > 0:
+                            hsrp_changed_dict[intf]["Changed"].append(
+                                group_diff["Changed values"].copy())
+
+                    except:
+
+                        if intf not in self.hsrp_dict_current:
+                            hsrp_changed_dict[intf]["Missing"].update(
+                                {"state": "Not found in HSRP current state"})
+                        else:
+                            hsrp_changed_dict[intf]["Missing"].extend(list(
+                                self.hsrp_dict_original[intf]["address_family"][addrFamily]["version"][version]["groups"].keys()))
+
+        hsrp_pop_keys = []
+        for intf in hsrp_changed_dict:
+            if len(hsrp_changed_dict[intf]["Missing"]) == 0 and len(hsrp_changed_dict[intf]["Changed"]) == 0:
+                hsrp_pop_keys.append(intf)
+        for pop_key in hsrp_pop_keys:
+            hsrp_changed_dict.pop(pop_key, None)
+
+        delta_hsrp = len(hsrp_changed_dict)
+        if len(self.hsrp_dict_original) != 0:
+            percentage_delta_hsrp = (
+                delta_hsrp / len(self.hsrp_dict_original)) * 100
+
+        return (hsrp_changed_dict, delta_hsrp, percentage_delta_hsrp)
+
+    def is_changed(self):
+        if hasattr(self, "hsrp_changed_dict"):
+            if self.delta_hsrp > 0:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def diff(self):
+        string = ""
+        if hasattr(self, "hsrp_changed_dict") and hasattr(self, "delta_hsrp") and hasattr(self, "percentage_delta_hsrp"):
+            string = "{} ({:.2f}%) HSRP's interfaces changed:\n".format(
+                self.delta_hsrp, self.percentage_delta_hsrp)
+            if self.delta_hsrp > 0:
+                for intf in self.hsrp_changed_dict:
+                    string = string + "{}{}\n".format(" "*3, intf)
+                    if len(self.hsrp_changed_dict[intf]["Missing"]) > 0:
+                        string = string + "{}Lost HSRP group: {}\n".format(
+                            " "*6, ", ".join(self.hsrp_changed_dict[intf]["Missing"]))
+                    if len(self.hsrp_changed_dict[intf]["Changed"]) > 0:
+                        for changed_element in self.hsrp_changed_dict[intf]["Changed"]:
+                            string = string + \
+                                "{}HSRP Group {} changed:\n".format(
+                                    " "*6, next(iter(changed_element)))
+                            for atribute, value in changed_element[next(iter(changed_element))].items():
+                                string = string + \
+                                    "{}{}: {} --> {}\n".format(
+                                        " "*9, atribute, value["original"], value["current"])
+
+        return string
 
 
 class AllDetail:
